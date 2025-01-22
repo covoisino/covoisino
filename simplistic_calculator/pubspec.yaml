@@ -22,8 +22,7 @@ dependencies:
       path: plugins/window_size
 
 dev_dependencies:
-  analysis_defaults:
-    path: ../analysis_defaults
+  analysis_options: any
   flutter_test:
     sdk: flutter
 
