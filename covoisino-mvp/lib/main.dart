@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
-// Global variable to store verification ID for phone authentication
-String? _verificationId;
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,8 +27,6 @@ class MyApp extends StatelessWidget {
         '/login': (_) => LoginPage(),
         '/forgot': (_) => ForgotPasswordPage(),
         '/verifyAccount': (_) => VerifyAccountPage(),
-        '/verifyPhone1': (_) => VerifyPhonePage1(),
-        '/verifyPhone2': (_) => VerifyPhonePage2(),
         '/home': (_) => HomePage(),
       },
     );
@@ -48,18 +46,73 @@ class _SignupPageState extends State<SignupPage> {
 
   Future<void> _signup() async {
     try {
-      UserCredential userCred = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      await userCred.user!
-          .updateDisplayName('${_firstNameController.text.trim()} ${_lastNameController.text.trim()}');
-      await userCred.user!.sendEmailVerification();
-      Navigator.pushReplacementNamed(context, '/verifyAccount');
+      if (_emailController.text.isNotEmpty && _passwordController.text.isNotEmpty) {
+        UserCredential userCred = await FirebaseAuth.instance
+            .createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        await userCred.user!
+            .updateDisplayName('${_firstNameController.text.trim()} ${_lastNameController.text.trim()}');
+        await userCred.user!.sendEmailVerification();
+        Navigator.pushReplacementNamed(context, '/verifyAccount');
+      }
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? 'Signup failed')),
+      );
+    }
+  }
+
+  Future<void> _signUpWithGoogle() async {
+    try {
+      final googleSignIn = GoogleSignIn();
+      await googleSignIn.signOut();
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) return;
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      Navigator.pushReplacementNamed(context, '/home');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Google signup failed')),
+      );
+    }
+  }
+
+  Future<void> _signUpWithApple() async {
+    try {
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+      );
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+      await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+      Navigator.pushReplacementNamed(context, '/home');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Apple signup failed')),
+      );
+    }
+  }
+
+  Future<void> _signUpWithFacebook() async {
+    try {
+      final result = await FacebookAuth.instance.login();
+      if (result.status == LoginStatus.success) {
+        final credential = FacebookAuthProvider.credential(result.accessToken!.tokenString);
+        await FirebaseAuth.instance.signInWithCredential(credential);
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Facebook signup failed')),
       );
     }
   }
@@ -70,36 +123,54 @@ class _SignupPageState extends State<SignupPage> {
       appBar: AppBar(title: Text('Signup')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _firstNameController,
-              decoration: InputDecoration(labelText: 'First Name'),
-            ),
-            TextField(
-              controller: _lastNameController,
-              decoration: InputDecoration(labelText: 'Last Name'),
-            ),
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(labelText: 'Email'),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(labelText: 'Password'),
-              obscureText: true,
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _signup,
-              child: Text('Signup'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
-              child: Text('Go to login'),
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextField(
+                controller: _firstNameController,
+                decoration: InputDecoration(labelText: 'First Name'),
+              ),
+              TextField(
+                controller: _lastNameController,
+                decoration: InputDecoration(labelText: 'Last Name'),
+              ),
+              TextField(
+                controller: _emailController,
+                decoration: InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              TextField(
+                controller: _passwordController,
+                decoration: InputDecoration(labelText: 'Password'),
+                obscureText: true,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _signup,
+                child: Text('Signup with email'),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _signUpWithGoogle,
+                child: Text('Signup with Google'),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _signUpWithApple,
+                child: Text('Signup with Apple'),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _signUpWithFacebook,
+                child: Text('Signup with Facebook'),
+              ),
+              SizedBox(height: 20),
+              TextButton(
+                onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+                child: Text('Go to login'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -117,20 +188,75 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     try {
-      UserCredential userCred = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      if (_emailController.text.isNotEmpty && _passwordController.text.isNotEmpty) {
+        UserCredential userCred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
-      await userCred.user!.reload(); // Refresh user info
-      if (userCred.user!.emailVerified) {
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        Navigator.pushReplacementNamed(context, '/verifyAccount');
+        await userCred.user!.reload(); // Refresh user info
+        if (userCred.user!.emailVerified) {
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          Navigator.pushReplacementNamed(context, '/verifyAccount');
+        }
       }
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? 'Login failed')),
+      );
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    try {
+      final googleSignIn = GoogleSignIn();
+      await googleSignIn.signOut();
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) return;
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      Navigator.pushReplacementNamed(context, '/home');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Google login failed')),
+      );
+    }
+  }
+
+  Future<void> _loginWithApple() async {
+    try {
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+      );
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+      await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+      Navigator.pushReplacementNamed(context, '/home');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Apple login failed')),
+      );
+    }
+  }
+
+  Future<void> _loginWithFacebook() async {
+    try {
+      final result = await FacebookAuth.instance.login();
+      if (result.status == LoginStatus.success) {
+        final credential = FacebookAuthProvider.credential(result.accessToken!.tokenString);
+        await FirebaseAuth.instance.signInWithCredential(credential);
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Facebook login failed')),
       );
     }
   }
@@ -141,32 +267,50 @@ class _LoginPageState extends State<LoginPage> {
       appBar: AppBar(title: Text('Login')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(labelText: 'Email'),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(labelText: 'Password'),
-              obscureText: true,
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _login,
-              child: Text('Login'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/signup'),
-              child: Text('Go to signup'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/forgot'),
-              child: Text('Forgot password'),
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextField(
+                controller: _emailController,
+                decoration: InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              TextField(
+                controller: _passwordController,
+                decoration: InputDecoration(labelText: 'Password'),
+                obscureText: true,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _login,
+                child: Text('Login with email'),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _loginWithGoogle,
+                child: Text('Login with Google'),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _loginWithApple,
+                child: Text('Login with Apple'),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _loginWithFacebook,
+                child: Text('Login with Facebook'),
+              ),
+              SizedBox(height: 20),
+              TextButton(
+                onPressed: () => Navigator.pushReplacementNamed(context, '/signup'),
+                child: Text('Go to signup'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pushReplacementNamed(context, '/forgot'),
+                child: Text('Forgot password'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -244,7 +388,7 @@ class _VerifyAccountPageState extends State<VerifyAccountPage> {
   Future<void> _continue() async {
     await user!.reload();
     if (FirebaseAuth.instance.currentUser!.emailVerified) {
-      Navigator.pushReplacementNamed(context, '/verifyPhone1');
+      Navigator.pushReplacementNamed(context, '/home');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please verify your email first')),
@@ -265,9 +409,9 @@ class _VerifyAccountPageState extends State<VerifyAccountPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            ElevatedButton(onPressed: _resendEmail, child: Text('Resend email')),
-            ElevatedButton(onPressed: _continue, child: Text('Continue')),
-            TextButton(onPressed: _restart, child: Text('Restart signup')),
+            Center(child: ElevatedButton(onPressed: _resendEmail, child: Text('Resend email'))),
+            Center(child: ElevatedButton(onPressed: _continue, child: Text('Continue'))),
+            Center(child: TextButton(onPressed: _restart, child: Text('Restart signup'))),
           ],
         ),
       ),
@@ -275,122 +419,161 @@ class _VerifyAccountPageState extends State<VerifyAccountPage> {
   }
 }
 
-class VerifyPhonePage1 extends StatefulWidget {
+class HomePage extends StatefulWidget {
   @override
-  _VerifyPhonePage1State createState() => _VerifyPhonePage1State();
+  _HomePageState createState() => _HomePageState();
 }
 
-class _VerifyPhonePage1State extends State<VerifyPhonePage1> {
-  final _phoneController = TextEditingController();
+class _HomePageState extends State<HomePage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  Future<void> _verifyPhone() async {
-    await FirebaseAuth.instance.verifyPhoneNumber(
-      phoneNumber: _phoneController.text.trim(),
-      verificationCompleted: (_) {},
-      verificationFailed: (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Verification failed')),
-        );
-      },
-      codeSent: (verId, _) {
-        _verificationId = verId;
-        Navigator.pushReplacementNamed(context, '/verifyPhone2');
-      },
-      codeAutoRetrievalTimeout: (verId) {
-        _verificationId = verId;
-      },
-    );
+  bool _canAddPassword = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfCanAddPassword();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Verify Phone')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _phoneController,
-              decoration: InputDecoration(labelText: 'Phone Number'),
-              keyboardType: TextInputType.phone,
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(onPressed: _verifyPhone, child: Text('Verify phone')),
-            TextButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
-              child: Text('Skip for now'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+  Future<void> _checkIfCanAddPassword() async {
+    User? user = _auth.currentUser;
 
-class VerifyPhonePage2 extends StatefulWidget {
-  @override
-  _VerifyPhonePage2State createState() => _VerifyPhonePage2State();
-}
-
-class _VerifyPhonePage2State extends State<VerifyPhonePage2> {
-  final _codeController = TextEditingController();
-
-  Future<void> _continue() async {
-    try {
-      final cred = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: _codeController.text.trim(),
-      );
-      await FirebaseAuth.instance.currentUser!.linkWithCredential(cred);
-      Navigator.pushReplacementNamed(context, '/home');
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invalid code')),
-      );
+    if (user != null) {
+      bool hasPassword = user.providerData.any((provider) => provider.providerId == 'password');
+      setState(() {
+        _canAddPassword = !hasPassword;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Enter Verification Code')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      appBar: AppBar(title: Text('Home')),
+      body: Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextField(
-              controller: _codeController,
-              decoration: InputDecoration(labelText: 'Verification Code'),
-              keyboardType: TextInputType.number,
+            ElevatedButton(
+              onPressed: () async {
+                await _auth.signOut();
+                await _googleSignIn.signOut();
+                Navigator.pushReplacementNamed(context, '/login');
+              },
+              child: Text('Logout'),
             ),
-            SizedBox(height: 20),
-            ElevatedButton(onPressed: _continue, child: Text('Continue')),
-            TextButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/verifyPhone1'),
-              child: Text('Back'),
+            ElevatedButton(
+              onPressed: _canAddPassword
+                  ? () async {
+                      await _addPasswordToAccount(context);
+                    }
+                  : null, // Disabled if false
+              child: Text('Add Password to Account'),
             ),
           ],
         ),
       ),
     );
   }
-}
 
-class HomePage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Home')),
-      body: Center(
-        child: ElevatedButton(
-          onPressed: () async {
-            await FirebaseAuth.instance.signOut();
-            Navigator.pushReplacementNamed(context, '/login');
-          },
-          child: Text('Logout'),
-        ),
-      ),
+  Future<void> _addPasswordToAccount(BuildContext context) async {
+    User? user = _auth.currentUser;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You need to be signed in to add a password.')),
+      );
+      return;
+    }
+
+    if (user.providerData.every((provider) => provider.providerId != 'password')) {
+      _showAddPasswordDialog(context, user);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You already have a password set up.')),
+      );
+    }
+  }
+
+  void _showAddPasswordDialog(BuildContext context, User user) {
+    final TextEditingController _passwordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Set a Password'),
+          content: TextField(
+            controller: _passwordController,
+            obscureText: true,
+            decoration: InputDecoration(hintText: 'Enter a new password'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                String password = _passwordController.text.trim();
+                if (password.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Please enter a password.')),
+                  );
+                  return;
+                }
+
+                try {
+                  final googleUser = await _googleSignIn.signIn();
+                  if (googleUser == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Google sign-in failed.')),
+                    );
+                    return;
+                  }
+
+                  final googleAuth = await googleUser.authentication;
+                  final accessToken = googleAuth.accessToken;
+                  final idToken = googleAuth.idToken;
+
+                  if (accessToken == null || idToken == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to get authentication tokens.')),
+                    );
+                    return;
+                  }
+
+                  final credential = GoogleAuthProvider.credential(
+                    accessToken: accessToken,
+                    idToken: idToken,
+                  );
+
+                  await user.reauthenticateWithCredential(credential);
+                  await user.updatePassword(password);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Password added successfully!')),
+                  );
+
+                  setState(() {
+                    _canAddPassword = false; // Update UI to reflect new password state
+                  });
+
+                  Navigator.of(context).pop();
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to add password: $e')),
+                  );
+                }
+              },
+              child: Text('Set Password'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
