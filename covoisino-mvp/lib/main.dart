@@ -111,7 +111,6 @@ class _SignupPageState extends State<SignupPage> {
         Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
-      print(e.toString());
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Facebook signup failed')),
       );
