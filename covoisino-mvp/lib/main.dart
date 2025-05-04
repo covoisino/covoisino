@@ -111,6 +111,7 @@ class _SignupPageState extends State<SignupPage> {
         Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
+      print(e.toString());
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Facebook signup failed')),
       );
@@ -154,16 +155,16 @@ class _SignupPageState extends State<SignupPage> {
                 onPressed: _signUpWithGoogle,
                 child: Text('Signup with Google'),
               ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _signUpWithApple,
-                child: Text('Signup with Apple'),
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _signUpWithFacebook,
-                child: Text('Signup with Facebook'),
-              ),
+              // SizedBox(height: 10),
+              // ElevatedButton(
+              //   onPressed: _signUpWithApple,
+              //   child: Text('Signup with Apple'),
+              // ),
+              // SizedBox(height: 10),
+              // ElevatedButton(
+              //   onPressed: _signUpWithFacebook,
+              //   child: Text('Signup with Facebook'),
+              // ),
               SizedBox(height: 20),
               TextButton(
                 onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
@@ -290,16 +291,16 @@ class _LoginPageState extends State<LoginPage> {
                 onPressed: _loginWithGoogle,
                 child: Text('Login with Google'),
               ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _loginWithApple,
-                child: Text('Login with Apple'),
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _loginWithFacebook,
-                child: Text('Login with Facebook'),
-              ),
+              // SizedBox(height: 10),
+              // ElevatedButton(
+              //   onPressed: _loginWithApple,
+              //   child: Text('Login with Apple'),
+              // ),
+              // SizedBox(height: 10),
+              // ElevatedButton(
+              //   onPressed: _loginWithFacebook,
+              //   child: Text('Login with Facebook'),
+              // ),
               SizedBox(height: 20),
               TextButton(
                 onPressed: () => Navigator.pushReplacementNamed(context, '/signup'),
