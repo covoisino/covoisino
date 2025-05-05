@@ -6,10 +6,14 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(MyApp());
 }
 
@@ -44,16 +48,65 @@ Future<void> navigateAfterAuth(BuildContext context) async {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
+
+  // allows child widgets to call setThemeMode / setLocale
+  static _MyAppState of(BuildContext context) =>
+      context.findAncestorStateOfType<_MyAppState>()!;
+
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.light;
+  Locale _locale = Locale('en');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _themeMode =
+          (prefs.getBool('isDarkMode') ?? false) ? ThemeMode.dark : ThemeMode.light;
+      _locale = Locale(prefs.getString('locale') ?? 'en');
+    });
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', mode == ThemeMode.dark);
+    setState(() => _themeMode = mode);
+  }
+
+  Future<void> setLocale(Locale locale) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('locale', locale.languageCode);
+    setState(() => _locale = locale);
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Firebase Auth App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      locale: _locale,
+      supportedLocales: [Locale('en'), Locale('fr')],
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        const SimpleLocalizationsDelegate(),
+      ],
+      theme: ThemeData.light(),
+      darkTheme: ThemeData.dark(),
+      themeMode: _themeMode,
+      onGenerateTitle: (ctx) =>
+          SimpleLocalizations.of(ctx).get('app_title'),
       initialRoute: '/signup',
       routes: {
         '/signup': (_) => SignupPage(),
@@ -62,9 +115,41 @@ class MyApp extends StatelessWidget {
         '/verifyAccount': (_) => VerifyAccountPage(),
         '/setup': (_) => SetupPage(),
         '/home': (_) => HomePage(),
+        '/options': (_) => OptionsPage(),   // ← new
       },
     );
   }
+}
+
+class SimpleLocalizations {
+  final Locale locale;
+  SimpleLocalizations(this.locale);
+
+  static SimpleLocalizations of(BuildContext context) =>
+      Localizations.of<SimpleLocalizations>(context, SimpleLocalizations)!;
+
+  static const Map<String, Map<String, String>> _vals = {
+    'en': {
+    },
+    'fr': {
+    },
+  };
+
+  String get(String key) =>
+      _vals[locale.languageCode]?[key] ?? key;
+}
+
+class SimpleLocalizationsDelegate
+    extends LocalizationsDelegate<SimpleLocalizations> {
+  const SimpleLocalizationsDelegate();
+  @override
+  bool isSupported(Locale locale) =>
+      ['en', 'fr'].contains(locale.languageCode);
+  @override
+  Future<SimpleLocalizations> load(Locale locale) async =>
+      SimpleLocalizations(locale);
+  @override
+  bool shouldReload(covariant LocalizationsDelegate old) => false;
 }
 
 class SignupPage extends StatefulWidget {
@@ -744,87 +829,349 @@ class _SetupPageState extends State<SetupPage> {
   }
 }
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   @override
-  _HomePageState createState() => _HomePageState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Home'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.menu),
+            onPressed: () => Navigator.pushReplacementNamed(context, '/options'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _HomePageState extends State<HomePage> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
-
-  bool _canAddPassword = false;
-
+class OptionsPage extends StatefulWidget {
   @override
-  void initState() {
-    super.initState();
-    _checkIfCanAddPassword();
-  }
+  _OptionsPageState createState() => _OptionsPageState();
+}
 
-  Future<void> _checkIfCanAddPassword() async {
-    final user = _auth.currentUser;
-    if (user != null) {
-      final hasPassword = user.providerData
-          .any((p) => p.providerId == EmailAuthProvider.PROVIDER_ID);
-      setState(() => _canAddPassword = !hasPassword);
-    }
-  }
+class _OptionsPageState extends State<OptionsPage> {
+  int _selectedIndex = 0;
+  final List<Widget> _tabs = [
+    ProfileContent(),
+    SettingsContent(),
+    AccountContent(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Home')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: _logout,
-              child: Text('Logout'),
-            ),
-            ElevatedButton(
-              onPressed: _canAddPassword ? _sendSetPasswordEmail : null,
-              child: Text('Add/Change Account Password'),
-            ),
-          ],
+      appBar: AppBar(
+        title: Text('Options'),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
         ),
+      ),
+      body: Row(
+        children: [
+          NavigationRail(
+            labelType: NavigationRailLabelType.all,
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+            destinations: [
+              NavigationRailDestination(
+                icon: Icon(Icons.person),
+                label: Text('Profile'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.settings),
+                label: Text('Settings'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.account_circle),
+                label: Text('Account'),
+              ),
+            ],
+          ),
+          VerticalDivider(thickness: 1, width: 1),
+          Expanded(child: _tabs[_selectedIndex]),
+        ],
       ),
     );
   }
+}
 
-  Future<void> _logout() async {
-    await _auth.signOut();
-    await _googleSignIn.signOut();
-    Navigator.pushReplacementNamed(context, '/login');
+class ProfileContent extends StatefulWidget {
+  @override
+  _ProfileContentState createState() => _ProfileContentState();
+}
+
+class _ProfileContentState extends State<ProfileContent> {
+  String? _dob, _gender, _carModel;
+  bool? _wantsToDrive;
+  final _doc = FirebaseFirestore.instance
+      .collection('users')
+      .doc(FirebaseAuth.instance.currentUser!.uid);
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
 
-  Future<void> _sendSetPasswordEmail() async {
-    final user = _auth.currentUser;
-    if (user == null || user.email == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No signed-in user or email found.')),
-      );
-      return;
-    }
+  Future<void> _load() async {
+    final snap = await _doc.get();
+    final d = snap.data() ?? {};
+    setState(() {
+      _dob = d['dob'];
+      _gender = d['gender'];
+      _wantsToDrive = d['wantsToDrive'];
+      _carModel = d['carModel'];
+    });
+  }
 
-    try {
-      await _auth.sendPasswordResetEmail(email: user.email!);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'An email has been sent to ${user.email!}. '
-            'Click the link to set your password.',
-          ),
+  Future<void> _update(String field, dynamic val) async {
+    await _doc.set({field: val}, SetOptions(merge: true));
+    await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(padding: EdgeInsets.all(16), children: [
+      ListTile(
+        title: Text('Date of Birth'),
+        subtitle: Text(_dob ?? '-'),
+        trailing: Icon(Icons.edit),
+        onTap: () async {
+          final d = await showDatePicker(
+            context: context,
+            initialDate: DateTime.now(),
+            firstDate: DateTime(1900),
+            lastDate: DateTime.now(),
+          );
+          if (d != null) {
+            final s = '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
+            await _update('dob', s);
+          }
+        },
+      ),
+      ListTile(
+        title: Text('Gender'),
+        subtitle: Text(_gender ?? '-'),
+        trailing: Icon(Icons.edit),
+        onTap: () async {
+          final choice = await showDialog<String>(
+            context: context,
+            builder: (_) => SimpleDialog(
+              title: Text('Gender'),
+              children: ['Male','Female','Other']
+                  .map((g) => SimpleDialogOption(
+                        onPressed: () => Navigator.pop(context, g),
+                        child: Text(g),
+                      ))
+                  .toList(),
+            ),
+          );
+          if (choice != null) await _update('gender', choice);
+        },
+      ),
+      ListTile(
+        title: Text('Do you want to be a driver?'),
+        subtitle: Text(_wantsToDrive == null
+            ? '-'
+            : (_wantsToDrive!
+                ? 'Yes'
+                : 'No')),
+        trailing: Icon(Icons.edit),
+        onTap: () async {
+          final c = await showDialog<bool>(
+            context: context,
+            builder: (_) => SimpleDialog(
+              title: Text('Do you want to be a driver?'),
+              children: [true, false]
+                  .map((v) => SimpleDialogOption(
+                        onPressed: () => Navigator.pop(context, v),
+                        child: Text(v
+                            ? 'Yes'
+                            : 'No'),
+                      ))
+                  .toList(),
+            ),
+          );
+          if (c != null) await _update('wantsToDrive', c);
+        },
+      ),
+      if (_wantsToDrive == true)
+        ListTile(
+          title: Text('Car Model'),
+          subtitle: Text(_carModel ?? '-'),
+          trailing: Icon(Icons.edit),
+          onTap: () async {
+            final ctl = TextEditingController(text: _carModel);
+            final res = await showDialog<String>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: Text('Car Model'),
+                content: TextField(controller: ctl),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('No'),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.pop(context, ctl.text.trim()),
+                    child: Text('Yes'),
+                  ),
+                ],
+              ),
+            );
+            if (res != null && res.isNotEmpty)
+              await _update('carModel', res);
+          },
         ),
-      );
-      setState(() {
-        // disable button until they sign out/sign back in
-        _canAddPassword = false;
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sending email: $e')),
-      );
-    }
+    ]);
+  }
+}
+
+class SettingsContent extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final appState = MyApp.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentLoc = Localizations.localeOf(context);
+
+    return ListView(padding: EdgeInsets.all(16), children: [
+      SwitchListTile(
+        title: Text('Toggle Light/Dark Mode'),
+        value: isDark,
+        onChanged: (v) =>
+            appState.setThemeMode(v ? ThemeMode.dark : ThemeMode.light),
+      ),
+      ListTile(
+        title: Text('Switch Language'),
+        trailing: DropdownButton<Locale>(
+          value: currentLoc,
+          items: [Locale('en'), Locale('fr')]
+              .map((loc) => DropdownMenuItem(
+                    value: loc,
+                    child: Text(loc.languageCode.toUpperCase()),
+                  ))
+              .toList(),
+          onChanged: (loc) {
+            if (loc != null) appState.setLocale(loc);
+          },
+        ),
+      ),
+    ]);
+  }
+}
+
+class AccountContent extends StatelessWidget {
+  final _auth = FirebaseAuth.instance;
+  final _google = GoogleSignIn();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(padding: EdgeInsets.all(16), children: [
+      ElevatedButton(
+        onPressed: () async {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text('Are you sure you want to log out?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: Text('Yes'),
+                ),
+              ],
+            ),
+          );
+
+          if (confirm == true) {
+            await _auth.signOut();
+            await _google.signOut();
+            Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+          }
+        },
+        child: Text('Logout'),
+      ),
+      ElevatedButton(
+        onPressed: () async {
+            final user = _auth.currentUser;
+            if (user?.email == null) return;
+            await _auth.sendPasswordResetEmail(email: user!.email!);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content:
+                    Text('Email sent to ${user.email} to set password.'),
+              ),
+            );
+          },
+        child: Text('Add/Change Account Password'),
+      ),
+      ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red, // make it stand out
+        ),
+        onPressed: () async {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('Confirm Delete'),
+              content: Text(
+                'This will permanently delete your account and all associated data. '
+                'Are you sure?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: Text('Yes'),
+                ),
+              ],
+            ),
+          );
+
+          if (confirm != true) return;
+
+          final user = _auth.currentUser;
+          if (user == null) return;
+
+          final uid = user.uid;
+          // 1. Delete Firestore data
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .delete();
+          // (If you have other collections keyed by uid, delete them here similarly)
+
+          // 2. Remove setup flag
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove('setupComplete_$uid');
+
+          // 3. Delete auth user
+          await user.delete();
+
+          // 4. Sign out from providers
+          await _auth.signOut();
+          await _google.signOut();
+
+          // 5. Navigate back to signup
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/signup',
+            (r) => false,
+          );
+        },
+        child: Text('Delete Account'),
+      ),
+    ]);
   }
 }
