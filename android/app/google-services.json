@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "333501090169",
+    "project_id": "covoisino-3dd5d",
+    "storage_bucket": "covoisino-3dd5d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:333501090169:android:f435bbfec0f1dd3e5487a8",
+        "android_client_info": {
+          "package_name": "com.example.covoisino"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLlcTIt35iWDttGPxB_lQULoU7PAhmhRA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
