@@ -10,6 +10,110 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'firebase_options.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:uuid/uuid.dart';
+
+class ReferralService {
+  static final _db = FirebaseFirestore.instance;
+  static final _auth = FirebaseAuth.instance;
+  static const _uuid = Uuid();
+
+  // Generate a one-time referral link
+  static Future<String> generateReferralLink() async {
+    final user = _auth.currentUser!;
+    const duration = Duration(hours: 24);
+    
+    final code = _uuid.v4().substring(0, 8);
+    await _db.collection('referralLinks').doc(code).set({
+      'creator': user.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+      'expiresAt': Timestamp.fromDate(DateTime.now().add(duration)),
+      'used': false,
+      'usedBy': null,
+    });
+
+    return 'https://covoisino.github.io/referral.html?code=$code';
+  }
+
+  // Validate and claim a referral code
+  static Future<String?> claimReferralCode(String code) async {
+    return _db.runTransaction<String?>((transaction) async {
+      final ref = _db.collection('referralLinks').doc(code);
+      final doc = await transaction.get(ref);
+
+      if (!doc.exists || doc['used'] || doc['expiresAt'].toDate().isBefore(DateTime.now())) {
+        return null;
+      }
+
+      transaction.update(ref, {
+        'used': true,
+        'usedBy': _auth.currentUser!.uid,
+        'usedAt': FieldValue.serverTimestamp(),
+      });
+
+      return doc['creator'];
+    });
+  }
+
+  // Get current user's sponsor count
+  static Stream<int> getSponsorCount() {
+    return _db.collection('users').doc(_auth.currentUser!.uid)
+        .snapshots()
+        .map((snap) => snap.data()?['sponsorsCount'] ?? 0);
+  }
+
+  // Get sponsor history
+  static Stream<List<Map<String, dynamic>>> getSponsorHistory() {
+    final user = _auth.currentUser!;
+    return _db.collection('users').doc(user.uid)
+        .collection('sponsorsHistory')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => doc.data())
+            .toList());
+  }
+
+  // Increment sponsor count
+  static Future<void> incrementSponsorCount(String referrerId) async {
+    final user = _auth.currentUser!;
+    final userRef = _db.collection('users').doc(user.uid);
+
+    await _db.runTransaction((transaction) async {
+      // 1. Get current document state
+      final docSnapshot = await transaction.get(userRef);
+      
+      // 2. Calculate current sponsor count
+      int currentCount = 0;
+      if (docSnapshot.exists) {
+        currentCount = (docSnapshot.data()!['sponsorsCount'] as int?) ?? 0;
+      }
+
+      // 3. Validate against maximum sponsors
+      if (currentCount >= 2) {
+        throw StateError('Maximum of 2 sponsors already reached');
+      }
+
+      // 4. Initialize document if needed
+      if (!docSnapshot.exists || !docSnapshot.data()!.containsKey('sponsorsCount')) {
+        transaction.set(userRef, {'sponsorsCount': currentCount}, SetOptions(merge: true));
+      }
+
+      // 5. Perform atomic increment
+      transaction.update(userRef, {
+        'sponsorsCount': FieldValue.increment(1),
+      });
+
+      // 6. Add history record
+      transaction.set(
+        userRef.collection('sponsorsHistory').doc(),
+        {
+          'uid': referrerId,
+          'timestamp': FieldValue.serverTimestamp(),
+        }
+      );
+    });
+  }
+}
 
 class ReferralLinkService {
   static const _chan = MethodChannel('referral_link');
@@ -28,12 +132,28 @@ class ReferralLinkService {
     if (link != null) _handleLink(link);
   }
 
-  void _handleLink(String link) {
+  void _handleLink(String link) async {
     final uri = Uri.parse(link);
-    final ref = uri.queryParameters['referrer'];
-    if (ref != null) {
-      navKey.currentState!
-        .pushNamed('/sponsor', arguments: ref);
+    final code = uri.queryParameters['code'];
+    if (code == null) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Handle auth first if needed
+      return;
+    }
+
+    final isValid = await FirebaseFirestore.instance
+        .collection('referralLinks')
+        .doc(code)
+        .get()
+        .then((doc) => 
+            doc.exists && 
+            !doc['used'] && 
+            doc['expiresAt'].toDate().isAfter(DateTime.now()));
+
+    if (isValid) {
+      navKey.currentState!.pushNamed('/sponsor', arguments: code);
     }
   }
 }
@@ -160,8 +280,8 @@ class _MyAppState extends State<MyApp> {
 
         // read the `referrer` string out of settings.arguments:
         '/sponsor': (ctx) {
-          final referrer = ModalRoute.of(ctx)!.settings.arguments as String;
-          return SponsorPage(referrer: referrer);
+          final code = ModalRoute.of(ctx)!.settings.arguments as String;
+          return SponsorPage(referralCode: code);
         },
       },
     );
@@ -621,7 +741,10 @@ class _SetupPageState extends State<SetupPage> {
 
     switch (_stage) {
       case 1:
-        // will be triggered by verifyPhone() or skip
+        // Initialize user document
+        batch.set(doc, {
+          'sponsorsCount': 0,
+        }, SetOptions(merge: true));
         break;
       case 2:
         // verify SMS code & link phone
@@ -878,23 +1001,17 @@ class _SetupPageState extends State<SetupPage> {
 
 class HomePage extends StatelessWidget {
   Future<void> _copyReferralLink(BuildContext ctx) async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    final link = 'https://covoisino.github.io/referral.html?referrer=$uid';
-
-    // copy to clipboard
-    await Clipboard.setData(ClipboardData(text: link));
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(content: Text('Referral link copied!')),
-    );
-
-    // optionally track it in Firestore
-    await FirebaseFirestore.instance
-        .collection('referrals')
-        .doc(uid)
-        .set({
-      'referrer': uid,
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    try {
+      final link = await ReferralService.generateReferralLink();
+      await Clipboard.setData(ClipboardData(text: link));
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(content: Text('One-time link copied! Expires in 24 hours')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(content: Text('Error generating link')),
+      );
+    }
   }
 
   @override
@@ -909,11 +1026,92 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
-      body: Center(
-        child: ElevatedButton(
-          onPressed: () => _copyReferralLink(context),
-          child: Text('Copy referral link'),
-        ),
+      body: StreamBuilder<int>(
+        stream: ReferralService.getSponsorCount(),
+        builder: (context, snapshot) {
+          final count = snapshot.data ?? 0;
+          
+          if (count < 2) {
+            return _buildSponsorInfo(context);
+          } else {
+            return _buildReferralGenerator(context);
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildReferralGenerator(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ElevatedButton(
+            onPressed: () => _copyReferralLink(context),
+            child: Text('Generate One-Time Referral Link'),
+          ),
+          SizedBox(height: 20),
+          Text(
+            'This link will expire after first use or 24 hours',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSponsorInfo(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          StreamBuilder<int>(
+            stream: ReferralService.getSponsorCount(),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return Text(
+                'Sponsors: $count/2',
+                style: Theme.of(context).textTheme.titleLarge,
+              );
+            },
+          ),
+          SizedBox(height: 20),
+          Text('Sponsorship History:', style: Theme.of(context).textTheme.titleMedium),
+          Expanded(
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: ReferralService.getSponsorHistory(),
+              builder: (context, snapshot) {
+                final history = snapshot.data ?? [];
+                if (history.isEmpty) {
+                  return Center(child: Text('No sponsorship history yet'));
+                }
+                
+                return ListView.builder(
+                  itemCount: history.length,
+                  itemBuilder: (context, index) {
+                    final entry = history[index];
+                    return FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(entry['uid'])
+                          .get(),
+                      builder: (context, snapshot) {
+                        final userData = snapshot.data?.data() as Map<String, dynamic>?;
+                        return ListTile(
+                          title: Text(userData?['displayName'] ?? 'Unknown User'),
+                          subtitle: Text(
+                            (entry['timestamp'] as Timestamp).toDate().toString(),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1249,15 +1447,79 @@ class AccountContent extends StatelessWidget {
   }
 }
 
-class SponsorPage extends StatelessWidget {
-  final String referrer;
-  const SponsorPage({required this.referrer});
+class SponsorPage extends StatefulWidget {
+  final String referralCode;
+  const SponsorPage({required this.referralCode});
+
+  @override
+  _SponsorPageState createState() => _SponsorPageState();
+}
+
+class _SponsorPageState extends State<SponsorPage> {
+  bool _processing = false;
+  String? _error;
+
+  Future<void> _handleAccept() async {
+    setState(() {
+      _processing = true;
+      _error = null;
+    });
+
+    try {
+      final currentCount = await ReferralService.getSponsorCount().first;
+      if (currentCount >= 2) {
+        throw Exception('Maximum sponsors reached');
+      }
+      final referrerId = await ReferralService.claimReferralCode(widget.referralCode);
+      if (referrerId == null) {
+        throw Exception('Invalid or expired referral code');
+      }
+
+      await ReferralService.incrementSponsorCount(referrerId);
+      Navigator.popUntil(context, (route) => route.isFirst);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      setState(() => _processing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Sponsor')),
-      body: Center(child: Text('You were referred by $referrer')),
+      appBar: AppBar(title: Text('Sponsorship Request')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_error != null)
+              Text(_error!, style: TextStyle(color: Colors.red)),
+            SizedBox(height: 20),
+            Text('Accept sponsorship invitation?',
+                style: Theme.of(context).textTheme.titleLarge),
+            SizedBox(height: 40),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: _processing ? null : _handleAccept,
+                  child: _processing 
+                    ? CircularProgressIndicator()
+                    : Text('Accept'),
+                ),
+                ElevatedButton(
+                  onPressed: _processing ? null : () => Navigator.pop(context),
+                  child: Text('Decline'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
