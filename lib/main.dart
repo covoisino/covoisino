@@ -8,6 +8,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'firebase_options.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+
+class ReferralLinkService {
+  static const _chan = MethodChannel('referral_link');
+  final GlobalKey<NavigatorState> navKey;
+
+  ReferralLinkService(this.navKey) {
+    _chan.setMethodCallHandler((call) async {
+      if (call.method == 'onLinkReceived') {
+        _handleLink(call.arguments as String);
+      }
+    });
+  }
+
+  Future<void> init() async {
+    final String? link = await _chan.invokeMethod('getInitialLink');
+    if (link != null) _handleLink(link);
+  }
+
+  void _handleLink(String link) {
+    final uri = Uri.parse(link);
+    final ref = uri.queryParameters['referrer'];
+    if (ref != null) {
+      navKey.currentState!
+        .pushNamed('/sponsor', arguments: ref);
+    }
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,12 +92,20 @@ class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
   Locale _locale = Locale('en');
 
+  // 1) navigatorKey for ReferralLinkService
   final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
+
+  // 2) referral link handler
+  late final ReferralLinkService _linkService;
 
   @override
   void initState() {
     super.initState();
     _loadPreferences();
+
+    // 3) instantiate and init the link service
+    _linkService = ReferralLinkService(_navKey);
+    _linkService.init();
   }
 
   Future<void> _loadPreferences() async {
@@ -95,7 +132,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: _navKey,
+      navigatorKey: _navKey,   // <-- plug in the nav key
       title: 'Flutter Firebase Auth App',
       locale: _locale,
       supportedLocales: [Locale('en'), Locale('fr')],
@@ -108,9 +145,10 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData.light(),
       darkTheme: ThemeData.dark(),
       themeMode: _themeMode,
-      onGenerateTitle: (ctx) =>
-          SimpleLocalizations.of(ctx).get('app_title'),
+      onGenerateTitle: (ctx) => SimpleLocalizations.of(ctx).get('app_title'),
       home: SignupPage(),
+
+      // 4) routes
       routes: {
         '/signup': (_) => SignupPage(),
         '/login': (_) => LoginPage(),
@@ -119,7 +157,12 @@ class _MyAppState extends State<MyApp> {
         '/setup': (_) => SetupPage(),
         '/home': (_) => HomePage(),
         '/options': (_) => OptionsPage(),
-        '/sponsor': (_) => SponsorPage(),
+
+        // read the `referrer` string out of settings.arguments:
+        '/sponsor': (ctx) {
+          final referrer = ModalRoute.of(ctx)!.settings.arguments as String;
+          return SponsorPage(referrer: referrer);
+        },
       },
     );
   }
@@ -834,6 +877,26 @@ class _SetupPageState extends State<SetupPage> {
 }
 
 class HomePage extends StatelessWidget {
+  Future<void> _copyReferralLink(BuildContext ctx) async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final link = 'https://covoisino.github.io/referral.html?referrer=$uid';
+
+    // copy to clipboard
+    await Clipboard.setData(ClipboardData(text: link));
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      SnackBar(content: Text('Referral link copied!')),
+    );
+
+    // optionally track it in Firestore
+    await FirebaseFirestore.instance
+        .collection('referrals')
+        .doc(uid)
+        .set({
+      'referrer': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -845,6 +908,12 @@ class HomePage extends StatelessWidget {
             onPressed: () => Navigator.pushReplacementNamed(context, '/options'),
           ),
         ],
+      ),
+      body: Center(
+        child: ElevatedButton(
+          onPressed: () => _copyReferralLink(context),
+          child: Text('Copy referral link'),
+        ),
       ),
     );
   }
@@ -1181,12 +1250,14 @@ class AccountContent extends StatelessWidget {
 }
 
 class SponsorPage extends StatelessWidget {
+  final String referrer;
+  const SponsorPage({required this.referrer});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Sponsor'),
-      ),
+      appBar: AppBar(title: Text('Sponsor')),
+      body: Center(child: Text('You were referred by $referrer')),
     );
   }
 }
