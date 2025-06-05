@@ -11,6 +11,9 @@ import 'firebase_options.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:flutter_map_marker_popup/flutter_map_marker_popup.dart';
 
 class ReferralService {
   static final _db = FirebaseFirestore.instance;
@@ -251,8 +254,163 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    const Color darkBlue = Color(0xFF0D47A1);
+    const Color lightBlue = Color(0xFF42A5F5);
+    const Color accentGreen = Color(0xFF43A047);
+    const Color accentRed = Color(0xFFE53935);
+
+    final lightColorScheme = ColorScheme.light(
+      primary: darkBlue,
+      primaryContainer: lightBlue,
+      secondary: accentGreen,
+      error: accentRed,
+      onPrimary: Colors.white,
+      onSecondary: Colors.white,
+      onError: Colors.white,
+      background: Colors.white,
+      surface: Colors.white,
+      onBackground: Colors.black87,
+      onSurface: Colors.black87,
+    );
+
+    final darkColorScheme = ColorScheme.dark(
+      primary: lightBlue,
+      primaryContainer: darkBlue,
+      secondary: Colors.green.shade200,
+      error: Colors.red.shade200,
+      onPrimary: Colors.black,
+      onSecondary: Colors.black,
+      onError: Colors.black,
+      background: Colors.black,
+      surface: Colors.grey.shade900,
+      onBackground: Colors.white,
+      onSurface: Colors.white,
+    );
+
+    final lightTheme = ThemeData.from(colorScheme: lightColorScheme).copyWith(
+      appBarTheme: AppBarTheme(
+        backgroundColor: lightColorScheme.primary,
+        foregroundColor: lightColorScheme.onPrimary,
+        elevation: 2,
+        titleTextStyle: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: lightColorScheme.onPrimary,
+        ),
+        iconTheme: IconThemeData(color: lightColorScheme.onPrimary),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          foregroundColor: lightColorScheme.onPrimary,
+          backgroundColor: lightColorScheme.primary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+      ),
+      textTheme: TextTheme(
+        bodyLarge: TextStyle(color: lightColorScheme.primary),
+        titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: lightColorScheme.primary),
+        bodyMedium: TextStyle(fontSize: 16, color: lightColorScheme.onBackground),
+        labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: lightColorScheme.primaryContainer.withOpacity(0.1),
+        labelStyle: TextStyle(color: lightColorScheme.primary, fontWeight: FontWeight.w500),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: lightColorScheme.primary, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: lightColorScheme.primaryContainer, width: 1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: lightColorScheme.error, width: 1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: lightColorScheme.error, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      dialogTheme: DialogTheme(
+        backgroundColor: lightColorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        titleTextStyle: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: lightColorScheme.primary,
+        ),
+        contentTextStyle: TextStyle(fontSize: 16, color: lightColorScheme.onSurface),
+      ),
+      iconTheme: IconThemeData(color: lightColorScheme.primary),
+    );
+
+    final darkTheme = ThemeData.from(colorScheme: darkColorScheme).copyWith(
+      appBarTheme: AppBarTheme(
+        backgroundColor: darkColorScheme.primary,
+        foregroundColor: darkColorScheme.onPrimary,
+        elevation: 2,
+        titleTextStyle: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: darkColorScheme.onPrimary,
+        ),
+        iconTheme: IconThemeData(color: darkColorScheme.onPrimary),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          foregroundColor: darkColorScheme.onPrimary,
+          backgroundColor: darkColorScheme.primary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+      ),
+      textTheme: TextTheme(
+        bodyLarge: TextStyle(color: darkColorScheme.primary),
+        titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: darkColorScheme.primary),
+        bodyMedium: TextStyle(fontSize: 16, color: darkColorScheme.onBackground),
+        labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: darkColorScheme.surface,
+        labelStyle: TextStyle(color: darkColorScheme.primary, fontWeight: FontWeight.w500),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: darkColorScheme.primary, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: darkColorScheme.primaryContainer, width: 1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: darkColorScheme.error, width: 1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: darkColorScheme.error, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      dialogTheme: DialogTheme(
+        backgroundColor: darkColorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        titleTextStyle: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: darkColorScheme.primary,
+        ),
+        contentTextStyle: TextStyle(fontSize: 16, color: darkColorScheme.onSurface),
+      ),
+      iconTheme: IconThemeData(color: darkColorScheme.primary),
+    );
+
     return MaterialApp(
-      navigatorKey: _navKey,   // <-- plug in the nav key
+      navigatorKey: _navKey, // <-- plug in the nav key
       title: 'Flutter Firebase Auth App',
       locale: _locale,
       supportedLocales: [Locale('en'), Locale('fr')],
@@ -262,8 +420,8 @@ class _MyAppState extends State<MyApp> {
         GlobalCupertinoLocalizations.delegate,
         const SimpleLocalizationsDelegate(),
       ],
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
+      theme: lightTheme,
+      darkTheme: darkTheme,
       themeMode: _themeMode,
       onGenerateTitle: (ctx) => SimpleLocalizations.of(ctx).get('app_title'),
       home: SignupPage(),
@@ -405,58 +563,119 @@ class _SignupPageState extends State<SignupPage> {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final accentGreen = Theme.of(context).colorScheme.secondary;
+
     return Scaffold(
-      appBar: AppBar(title: Text('Signup')),
-      body: Padding(
+      appBar: AppBar(
+        title: Text('Signup'),
+        centerTitle: true,
+        elevation: 2,
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              TextField(
-                controller: _firstNameController,
-                decoration: InputDecoration(labelText: 'First Name'),
+        child: Column(
+          children: [
+            SizedBox(height: 20),
+            Text(
+              'Create Account',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            SizedBox(height: 20),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              TextField(
-                controller: _lastNameController,
-                decoration: InputDecoration(labelText: 'Last Name'),
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // First Name Field
+                    TextField(
+                      controller: _firstNameController,
+                      decoration: InputDecoration(
+                        labelText: 'First Name',
+                        prefixIcon: Icon(Icons.person, color: primaryColor),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    // Last Name Field
+                    TextField(
+                      controller: _lastNameController,
+                      decoration: InputDecoration(
+                        labelText: 'Last Name',
+                        prefixIcon: Icon(Icons.person_outline, color: primaryColor),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    // Email Field
+                    TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.email, color: primaryColor),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    SizedBox(height: 16),
+                    // Password Field
+                    TextField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: Icon(Icons.lock, color: primaryColor),
+                      ),
+                      obscureText: true,
+                    ),
+                    SizedBox(height: 24),
+                    // Signup Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _signup,
+                        child: Text('Signup with Email'),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    // Google Signup Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _signUpWithGoogle,
+                        child: Text('Continue with Google'),
+                      ),
+                    ),
+                    // Uncomment for Apple/Facebook when ready:
+                    // SizedBox(height: 16),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: ElevatedButton(
+                    //     onPressed: _signUpWithApple,
+                    //     child: Text('Continue with Apple'),
+                    //   ),
+                    // ),
+                    // SizedBox(height: 16),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: ElevatedButton(
+                    //     onPressed: _signUpWithFacebook,
+                    //     child: Text('Continue with Facebook'),
+                    //   ),
+                    // ),
+                  ],
+                ),
               ),
-              TextField(
-                controller: _emailController,
-                decoration: InputDecoration(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
+            ),
+            SizedBox(height: 24),
+            TextButton(
+              onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+              child: Text(
+                'Go to Login',
+                style: TextStyle(color: accentGreen),
               ),
-              TextField(
-                controller: _passwordController,
-                decoration: InputDecoration(labelText: 'Password'),
-                obscureText: true,
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _signup,
-                child: Text('Signup with email'),
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _signUpWithGoogle,
-                child: Text('Continue with Google'),
-              ),
-              // SizedBox(height: 10),
-              // ElevatedButton(
-              //   onPressed: _signUpWithApple,
-              //   child: Text('Continue with Apple'),
-              // ),
-              // SizedBox(height: 10),
-              // ElevatedButton(
-              //   onPressed: _signUpWithFacebook,
-              //   child: Text('Continue with Facebook'),
-              // ),
-              SizedBox(height: 20),
-              TextButton(
-                onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
-                child: Text('Go to login'),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -549,54 +768,116 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Pull colors from the active ThemeData
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final accentGreen = Theme.of(context).colorScheme.secondary;
+
     return Scaffold(
-      appBar: AppBar(title: Text('Login')),
-      body: Padding(
+      appBar: AppBar(
+        title: Text('Login'),
+        centerTitle: true,
+        elevation: 2,
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              TextField(
-                controller: _emailController,
-                decoration: InputDecoration(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
+        child: Column(
+          children: [
+            SizedBox(height: 20),
+            Text(
+              'Welcome Back',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            SizedBox(height: 20),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              TextField(
-                controller: _passwordController,
-                decoration: InputDecoration(labelText: 'Password'),
-                obscureText: true,
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // Email Field
+                    TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.email, color: primaryColor),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    SizedBox(height: 16),
+                    // Password Field
+                    TextField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: Icon(Icons.lock, color: primaryColor),
+                      ),
+                      obscureText: true,
+                    ),
+                    SizedBox(height: 24),
+                    // Login Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _login,
+                        child: Text('Login with Email'),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    // Google Login Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _loginWithGoogle,
+                        child: Text('Continue with Google'),
+                      ),
+                    ),
+                    // If you uncomment Apple/Facebook options, they will match theme
+                    // SizedBox(height: 16),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: ElevatedButton(
+                    //     onPressed: _loginWithApple,
+                    //     child: Text('Continue with Apple'),
+                    //   ),
+                    // ),
+                    // SizedBox(height: 16),
+                    // SizedBox(
+                    //   width: double.infinity,
+                    //   child: ElevatedButton(
+                    //     onPressed: _loginWithFacebook,
+                    //     child: Text('Continue with Facebook'),
+                    //   ),
+                    // ),
+                  ],
+                ),
               ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _login,
-                child: Text('Login with email'),
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _loginWithGoogle,
-                child: Text('Continue with Google'),
-              ),
-              // SizedBox(height: 10),
-              // ElevatedButton(
-              //   onPressed: _loginWithApple,
-              //   child: Text('Continue with Apple'),
-              // ),
-              // SizedBox(height: 10),
-              // ElevatedButton(
-              //   onPressed: _loginWithFacebook,
-              //   child: Text('Continue with Facebook'),
-              // ),
-              SizedBox(height: 20),
-              TextButton(
-                onPressed: () => Navigator.pushReplacementNamed(context, '/signup'),
-                child: Text('Go to signup'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pushReplacementNamed(context, '/forgot'),
-                child: Text('Forgot password'),
-              ),
-            ],
-          ),
+            ),
+            SizedBox(height: 24),
+            // Footer Links
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pushReplacementNamed(context, '/signup'),
+                  child: Text(
+                    'Go to Signup',
+                    style: TextStyle(color: accentGreen),
+                  ),
+                ),
+                SizedBox(width: 16),
+                TextButton(
+                  onPressed: () => Navigator.pushReplacementNamed(context, '/forgot'),
+                  child: Text(
+                    'Forgot Password',
+                    style: TextStyle(color: accentGreen),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -627,25 +908,63 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final accentGreen = Theme.of(context).colorScheme.secondary;
+
     return Scaffold(
-      appBar: AppBar(title: Text('Forgot Password')),
-      body: Padding(
+      appBar: AppBar(
+        title: Text('Forgot Password'),
+        centerTitle: true,
+        elevation: 2,
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(labelText: 'Email'),
-              keyboardType: TextInputType.emailAddress,
+            SizedBox(height: 20),
+            Text(
+              'Reset Your Password',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _resetPassword,
-              child: Text('Send reset email'),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // Email Field
+                    TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.email, color: primaryColor),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    SizedBox(height: 24),
+                    // Send Reset Email Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _resetPassword,
+                        child: Text('Send Reset Email'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
+            SizedBox(height: 24),
             TextButton(
               onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
-              child: Text('Back to login'),
+              child: Text(
+                'Back to Login',
+                style: TextStyle(color: accentGreen),
+              ),
             ),
           ],
         ),
@@ -689,15 +1008,90 @@ class _VerifyAccountPageState extends State<VerifyAccountPage> {
 
   @override
   Widget build(BuildContext context) {
+    final accentGreen = Theme.of(context).colorScheme.secondary;
+    final accentRed = Theme.of(context).colorScheme.error;
+
     return Scaffold(
-      appBar: AppBar(title: Text('Verify Account')),
-      body: Padding(
+      appBar: AppBar(
+        title: Text('Verify Account'),
+        centerTitle: true,
+        elevation: 2,
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Center(child: ElevatedButton(onPressed: _resendEmail, child: Text('Resend email'))),
-            Center(child: ElevatedButton(onPressed: _continue, child: Text('Continue'))),
-            Center(child: TextButton(onPressed: _restart, child: Text('Restart signup'))),
+            SizedBox(height: 20),
+            Text(
+              'Email Verification',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            SizedBox(height: 12),
+            Text(
+              'A verification email has been sent to your inbox. Please check your email and click on the verification link before continuing.',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 24),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // Resend Email Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _resendEmail,
+                        icon: Icon(Icons.refresh, color: Colors.white),
+                        label: Text('Resend Email'),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    // Continue Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _continue,
+                        icon: Icon(Icons.check_circle, color: Colors.white),
+                        label: Text('Continue'),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    // Restart Signup Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _restart,
+                        icon: Icon(Icons.restart_alt, color: Colors.white),
+                        label: Text('Restart Signup'),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: accentRed,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                          textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 24),
+            TextButton(
+              onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+              child: Text(
+                'Back to Login',
+                style: TextStyle(color: accentGreen),
+              ),
+            ),
           ],
         ),
       ),
@@ -713,23 +1107,20 @@ class SetupPage extends StatefulWidget {
 class _SetupPageState extends State<SetupPage> {
   int _stage = 1;
 
-  // Stage 1 & 2 (phone)
+  // Stage 3 & 4 (phone)
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _smsController = TextEditingController();
   String? _verificationId;
 
-  // Stage 3 (dob & gender)
+  // Stage 5 (dob & gender)
   final TextEditingController _dobController = TextEditingController();
   String? _gender;
 
-  // Stage 4 (driver?)
+  // Stage 1 (driver?)
   bool? _wantsToDrive;
 
-  // Stage 5 (car model)
+  // Stage 2 (car model)
   final TextEditingController _carModelController = TextEditingController();
-
-  // Stage 6 (location)
-  String? _location;
 
   User? get _user => FirebaseAuth.instance.currentUser;
   FirebaseFirestore get _db => FirebaseFirestore.instance;
@@ -741,12 +1132,21 @@ class _SetupPageState extends State<SetupPage> {
 
     switch (_stage) {
       case 1:
-        // Initialize user document
+        // initialize + wantsToDrive
         batch.set(doc, {
           'sponsorsCount': 0,
+          'wantsToDrive': _wantsToDrive,
         }, SetOptions(merge: true));
         break;
       case 2:
+        // driver chose a car
+        if (_wantsToDrive == true && _carModelController.text.trim().isNotEmpty) {
+          batch.set(doc, {
+            'carModel': _carModelController.text.trim(),
+          }, SetOptions(merge: true));
+        }
+        break;
+      case 4:
         // verify SMS code & link phone
         if (_smsController.text.trim().isNotEmpty && _verificationId != null) {
           final cred = PhoneAuthProvider.credential(
@@ -754,30 +1154,22 @@ class _SetupPageState extends State<SetupPage> {
             smsCode: _smsController.text.trim(),
           );
           await _user!.linkWithCredential(cred);
-          batch.set(doc, {'phone': _phoneController.text.trim()}, SetOptions(merge: true));
-        }
-        break;
-      case 3:
-        if (_dobController.text.trim().isNotEmpty) {
-          batch.set(doc, {'dob': _dobController.text.trim()}, SetOptions(merge: true));
-        }
-        if (_gender != null) {
-          batch.set(doc, {'gender': _gender}, SetOptions(merge: true));
-        }
-        break;
-      case 4:
-        if (_wantsToDrive != null) {
-          batch.set(doc, {'wantsToDrive': _wantsToDrive}, SetOptions(merge: true));
+          batch.set(doc, {
+            'phone': _phoneController.text.trim(),
+          }, SetOptions(merge: true));
         }
         break;
       case 5:
-        if (_carModelController.text.trim().isNotEmpty) {
-          batch.set(doc, {'carModel': _carModelController.text.trim()}, SetOptions(merge: true));
+        // dob & gender
+        if (_dobController.text.trim().isNotEmpty) {
+          batch.set(doc, {
+            'dob': _dobController.text.trim(),
+          }, SetOptions(merge: true));
         }
-        break;
-      case 6:
-        if (_location != null) {
-          batch.set(doc, {'location': _location}, SetOptions(merge: true));
+        if (_gender != null) {
+          batch.set(doc, {
+            'gender': _gender,
+          }, SetOptions(merge: true));
         }
         break;
     }
@@ -785,9 +1177,14 @@ class _SetupPageState extends State<SetupPage> {
     await batch.commit();
 
     setState(() {
-      if (_stage < 6) {
-        if (_stage == 4) {
-          _stage = _wantsToDrive == true ? 5 : 6;
+      if (_stage < 5) {
+        if (_stage == 1) {
+          // go to car model or skip to phone
+          _stage = _wantsToDrive! ? 2 : 3;
+        } else if (_stage == 2) {
+          _stage = 3;
+        } else if (_stage == 4) {
+          _stage = 5;
         } else {
           _stage++;
         }
@@ -801,17 +1198,16 @@ class _SetupPageState extends State<SetupPage> {
     setState(() {
       switch (_stage) {
         case 2:
-        case 3:
           _stage = 1;
+          break;
+        case 3:
+          _stage = _wantsToDrive! ? 2 : 1;
           break;
         case 4:
           _stage = 3;
           break;
         case 5:
-          _stage = 4;
-          break;
-        case 6:
-          _stage = (_wantsToDrive == true) ? 5 : 4;
+          _stage = _wantsToDrive! ? 4 : 3;
           break;
       }
     });
@@ -833,7 +1229,7 @@ class _SetupPageState extends State<SetupPage> {
       codeSent: (id, _) {
         setState(() {
           _verificationId = id;
-          _stage = 2;
+          _stage = 4;
         });
       },
       codeAutoRetrievalTimeout: (_) {},
@@ -855,25 +1251,64 @@ class _SetupPageState extends State<SetupPage> {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final accentGreen = Theme.of(context).colorScheme.secondary;
+
     Widget content;
     switch (_stage) {
       case 1:
         content = Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            TextField(
-              controller: _phoneController,
-              decoration: InputDecoration(labelText: 'Phone Number'),
-              keyboardType: TextInputType.phone,
+            Text(
+              'Driver Setup',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(onPressed: _verifyPhone, child: Text('Verify Phone')),
-                TextButton(
-                  onPressed: () => setState(() => _stage = 3),
-                  child: Text('Skip'),
+            SizedBox(height: 12),
+            Text(
+              'Do you want to become a driver?',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 3,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Radio<bool>(
+                          value: true,
+                          groupValue: _wantsToDrive,
+                          onChanged: (v) => setState(() => _wantsToDrive = v),
+                        ),
+                        Text('Yes', style: TextStyle(color: primaryColor)),
+                        SizedBox(width: 24),
+                        Radio<bool>(
+                          value: false,
+                          groupValue: _wantsToDrive,
+                          onChanged: (v) => setState(() => _wantsToDrive = v),
+                        ),
+                        Text('No', style: TextStyle(color: primaryColor)),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _wantsToDrive == null ? null : _nextStage,
+                        child: Text('Continue'),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         );
@@ -881,89 +1316,197 @@ class _SetupPageState extends State<SetupPage> {
 
       case 2:
         content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _smsController,
-              decoration: InputDecoration(labelText: 'SMS Code'),
-              keyboardType: TextInputType.number,
+            Text(
+              'Vehicle Information',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            ElevatedButton(onPressed: _nextStage, child: Text('Continue')),
+            SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _carModelController,
+                      decoration: InputDecoration(
+                        labelText: 'Car Model',
+                        prefixIcon: Icon(Icons.directions_car, color: primaryColor),
+                      ),
+                    ),
+                    SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _nextStage,
+                        child: Text('Continue'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         );
         break;
 
       case 3:
         content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _dobController,
-              decoration: InputDecoration(labelText: 'Date of Birth'),
-              readOnly: true,
-              onTap: _pickDob,
+            Text(
+              'Phone Verification',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            DropdownButtonFormField<String>(
-              value: _gender,
-              items: ['Male', 'Female', 'Other']
-                  .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                  .toList(),
-              onChanged: (v) => setState(() => _gender = v),
-              decoration: InputDecoration(labelText: 'Gender'),
+            SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _phoneController,
+                      decoration: InputDecoration(
+                        labelText: 'Phone Number',
+                        prefixIcon: Icon(Icons.phone, color: primaryColor),
+                      ),
+                      keyboardType: TextInputType.phone,
+                    ),
+                    SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _verifyPhone,
+                            child: Text('Verify Phone'),
+                          ),
+                        ),
+                        if (_wantsToDrive == false)
+                          SizedBox(width: 16),
+                        if (_wantsToDrive == false)
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => setState(() => _stage = 5),
+                              child: Text(
+                                'Skip',
+                                style: TextStyle(color: accentGreen),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            ElevatedButton(onPressed: _nextStage, child: Text('Continue')),
           ],
         );
         break;
 
       case 4:
         content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Do you want to become a driver?'),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Radio<bool>(
-                  value: true,
-                  groupValue: _wantsToDrive,
-                  onChanged: (v) => setState(() => _wantsToDrive = v),
-                ),
-                Text('Yes'),
-                Radio<bool>(
-                  value: false,
-                  groupValue: _wantsToDrive,
-                  onChanged: (v) => setState(() => _wantsToDrive = v),
-                ),
-                Text('No'),
-              ],
+            Text(
+              'Enter SMS Code',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            ElevatedButton(onPressed: _nextStage, child: Text('Continue')),
+            SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _smsController,
+                      decoration: InputDecoration(
+                        labelText: 'SMS Code',
+                        prefixIcon: Icon(Icons.message, color: primaryColor),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _nextStage,
+                        child: Text('Continue'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         );
         break;
 
       case 5:
         content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _carModelController,
-              decoration: InputDecoration(labelText: 'Car Model'),
+            Text(
+              'Personal Details',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            ElevatedButton(onPressed: _nextStage, child: Text('Continue')),
-          ],
-        );
-        break;
-
-      case 6:
-        content = Column(
-          children: [
-            DropdownButtonFormField<String>(
-              value: _location,
-              items: ['New York', 'Los Angeles', 'Chicago']
-                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
-                  .toList(),
-              onChanged: (v) => setState(() => _location = v),
-              decoration: InputDecoration(labelText: 'Where do you live?'),
+            SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _dobController,
+                      decoration: InputDecoration(
+                        labelText: 'Date of Birth',
+                        prefixIcon: Icon(Icons.calendar_today, color: primaryColor),
+                      ),
+                      readOnly: true,
+                      onTap: _pickDob,
+                    ),
+                    SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _gender,
+                      items: ['Male', 'Female', 'Other']
+                          .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                          .toList(),
+                      onChanged: (v) => setState(() => _gender = v),
+                      decoration: InputDecoration(
+                        labelText: 'Gender',
+                        prefixIcon: Icon(Icons.person, color: primaryColor),
+                      ),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _nextStage,
+                        child: Text('Finish'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            ElevatedButton(onPressed: _nextStage, child: Text('Finish')),
           ],
         );
         break;
@@ -974,7 +1517,9 @@ class _SetupPageState extends State<SetupPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Setup — Stage $_stage of 6'),
+        title: Text('Setup — Stage $_stage of 5'),
+        centerTitle: true,
+        elevation: 2,
         leading: _stage > 1
             ? IconButton(
                 icon: Icon(Icons.arrow_back),
@@ -982,9 +1527,9 @@ class _SetupPageState extends State<SetupPage> {
               )
             : null,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(child: content),
+        child: content,
       ),
     );
   }
@@ -999,7 +1544,69 @@ class _SetupPageState extends State<SetupPage> {
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+  int _selectedIndex = 0;
+
+  String? _location;
+  bool? _driverLocationOn;
+  bool? _autoDriveModeOn;
+  bool? _driverNotificationsOn;
+  final _doc = FirebaseFirestore.instance
+      .collection('users')
+      .doc(FirebaseAuth.instance.currentUser!.uid);
+
+  final PopupController _popupController = PopupController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Only run if they’ve opted into auto‐drive mode
+    if (_autoDriveModeOn == true) {
+      if (state == AppLifecycleState.resumed) {
+        // app came to foreground ⇒ turn location on
+        _update('driverLocationOn', true);
+      } else if (state == AppLifecycleState.paused ||
+                 state == AppLifecycleState.inactive ||
+                 state == AppLifecycleState.detached) {
+        // app went to background ⇒ turn location off
+        _update('driverLocationOn', false);
+      }
+    }
+  }
+
+  Future<void> _load() async {
+    final snap = await _doc.get();
+    final d = snap.data() ?? {};
+    setState(() {
+      _location = d['location'];
+      _driverLocationOn = d['driverLocationOn'];
+      _autoDriveModeOn = d['autoDriveModeOn'];
+      _driverNotificationsOn = d['driverNotificationsOn'];
+    });
+  }
+
+  Future<void> _update(String field, dynamic val) async {
+    await _doc.set({field: val}, SetOptions(merge: true));
+    await _load();
+  }
+
   Future<void> _copyReferralLink(BuildContext ctx) async {
     try {
       final link = await ReferralService.generateReferralLink();
@@ -1018,42 +1625,396 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Home'),
+        title: (_selectedIndex == 0
+            ? Text('Home')
+            : _selectedIndex == 1
+                ? Text('Ride')
+                : Text('Drive')),
+        centerTitle: true,
+        elevation: 2,
         actions: [
           IconButton(
             icon: Icon(Icons.menu),
-            onPressed: () => Navigator.pushReplacementNamed(context, '/options'),
+            onPressed: () => Navigator.pushNamed(context, '/options'),
           ),
         ],
       ),
       body: StreamBuilder<int>(
         stream: ReferralService.getSponsorCount(),
         builder: (context, snapshot) {
-          final count = snapshot.data ?? 0;
-          
+          // Don’t default to 0. Instead, wait until we have real data.
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final count = snapshot.data!; // safe because we know hasData == true
           if (count < 2) {
             return _buildSponsorInfo(context);
           } else {
-            return _buildReferralGenerator(context);
+            return _buildWithTabs(context);
           }
+        },
+      ),
+      bottomNavigationBar: StreamBuilder<int>(
+        stream: ReferralService.getSponsorCount(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const SizedBox.shrink();
+          }
+          final count = snapshot.data!;
+          if (count < 2) {
+            return const SizedBox.shrink();
+          }
+
+          return BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            selectedItemColor: Theme.of(context).colorScheme.primary,
+            unselectedItemColor:
+                Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
+            onTap: (i) => setState(() => _selectedIndex = i),
+            items: const [
+              BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+              BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Ride'),
+              BottomNavigationBarItem(
+                  icon: Icon(Icons.directions_car_filled), label: 'Drive'),
+            ],
+          );
         },
       ),
     );
   }
 
-  Widget _buildReferralGenerator(BuildContext context) {
-    return Center(
+  Widget _buildWithTabs(BuildContext context) {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildHomeTab(context);
+      case 1:
+        return _buildRideTab(context);
+      case 2:
+        return _buildDriveTab(context);
+      default:
+        return SizedBox.expand();
+    }
+  }
+
+  Widget _buildHomeTab(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          ElevatedButton(
-            onPressed: () => _copyReferralLink(context),
-            child: Text('Generate One-Time Referral Link'),
+          Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text(
+                    'Referral & Location',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _copyReferralLink(context),
+                      icon: Icon(Icons.link),
+                      label: Text('Generate Referral Link'),
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  DropdownButtonFormField<String>(
+                    value: _location,
+                    items: ['Paris','London', 'New York', 'Chicago']
+                        .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                        .toList(),
+                    onChanged: (v) async {
+                      if (v != null) await _update('location', v);
+                    },
+                    selectedItemBuilder: (context) {
+                      return ['Paris','London', 'New York', 'Chicago']
+                          .map((l) => Text('Current location: $l'))
+                          .toList();
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Select Location',
+                      prefixIcon: Icon(Icons.location_on, color: primaryColor),
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
           ),
-          SizedBox(height: 20),
-          Text(
-            'This link will expire after first use or 24 hours',
-            style: Theme.of(context).textTheme.bodySmall,
+          SizedBox(height: 24),
+          Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text(
+                    'What would you like to do?',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => setState(() => _selectedIndex = 1),
+                      child: Text('I want to ride'),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => setState(() => _selectedIndex = 2),
+                      child: Text('I want to drive'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRideTab(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    final markers = <Marker>[];
+    if (_driverLocationOn == true) {
+      markers.add(
+        Marker(
+          // point: LatLng(41.791578, -87.599826),
+          point: LatLng(45.811516, 4.797935),
+          width: 30,
+          height: 30,
+          child: GestureDetector(
+            child:
+                Icon(Icons.directions_car_filled, size: 40, color: primaryColor),
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        FlutterMap(
+          options: MapOptions(
+            // initialCenter: LatLng(41.791578, -87.599826),
+            initialCenter: LatLng(45.811516, 4.797935),
+            initialZoom: 19.5,
+            onTap: (_, __) => _popupController.hideAllPopups(),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            ),
+            MarkerLayer(markers: markers),
+            PopupMarkerLayerWidget(
+              options: PopupMarkerLayerOptions(
+                markers: markers,
+                popupController: _popupController,
+                popupDisplayOptions: PopupDisplayOptions(
+                  builder: (BuildContext context, Marker marker) => Card(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text("John Pork",
+                              style: TextStyle(
+                                  color: primaryColor,
+                                  fontWeight: FontWeight.w600)),
+                          Text("(571)-639-1312"),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          bottom: 24,
+          left: 16,
+          right: 16,
+          child: Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            color: Colors.white.withOpacity(0.9),
+            elevation: 4,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: Icon(Icons.qr_code_scanner),
+                      label: Text('Scan a QR Code'),
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: Icon(Icons.call),
+                      label: Text('Emergency Call'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: Icon(Icons.share_location),
+                      label: Text('Share Location'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDriveTab(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Driver Settings',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  SizedBox(height: 12),
+                  DropdownButtonFormField<bool>(
+                    isExpanded: true,
+                    value: _driverLocationOn,
+                    items: [
+                      DropdownMenuItem(value: true, child: Text('On')),
+                      DropdownMenuItem(value: false, child: Text('Off')),
+                    ],
+                    onChanged: _autoDriveModeOn == true
+                        ? null
+                        : (v) async {
+                            if (v != null) await _update('driverLocationOn', v);
+                          },
+                    selectedItemBuilder: (BuildContext context) {
+                      return [true, false].map((value) {
+                        return Text(value
+                            ? 'Driver location is on'
+                            : 'Driver location is off');
+                      }).toList();
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Location Tracking',
+                      prefixIcon:
+                          Icon(Icons.location_on, color: primaryColor),
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  SizedBox(height: 20),
+                  DropdownButtonFormField<bool>(
+                    isExpanded: true,
+                    value: _autoDriveModeOn,
+                    items: [
+                      DropdownMenuItem(value: true, child: Text('Allow')),
+                      DropdownMenuItem(value: false, child: Text('Do not allow')),
+                    ],
+                    onChanged: (v) async {
+                      if (v != null) await _update('autoDriveModeOn', v);
+                      if (v == true) await _update('driverLocationOn', true);
+                    },
+                    selectedItemBuilder: (BuildContext context) {
+                      return [true, false].map((value) {
+                        return Text(
+                          value
+                              ? 'Allow automatic location on/off'
+                              : 'Do not allow automatic location',
+                          maxLines: 2,
+                          softWrap: true,
+                        );
+                      }).toList();
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Auto-Drive Mode',
+                      prefixIcon:
+                          Icon(Icons.autorenew, color: primaryColor),
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  SizedBox(height: 20),
+                  DropdownButtonFormField<bool>(
+                    isExpanded: true,
+                    value: _driverNotificationsOn,
+                    items: [
+                      DropdownMenuItem(value: true, child: Text('Allow')),
+                      DropdownMenuItem(value: false, child: Text('Do not allow')),
+                    ],
+                    onChanged: (v) async {
+                      if (v != null) await _update('driverNotificationsOn', v);
+                    },
+                    selectedItemBuilder: (BuildContext context) {
+                      return [true, false].map((value) {
+                        return Text(
+                          value
+                              ? 'Allow notifications while driving'
+                              : 'Do not allow notifications',
+                          maxLines: 2,
+                          softWrap: true,
+                        );
+                      }).toList();
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Notifications',
+                      prefixIcon:
+                          Icon(Icons.notifications, color: primaryColor),
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: Icon(Icons.qr_code),
+                      label: Text('Create a QR Code'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -1061,32 +2022,58 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildSponsorInfo(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final onBackground = Theme.of(context).colorScheme.onBackground;
+
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          StreamBuilder<int>(
-            stream: ReferralService.getSponsorCount(),
-            builder: (context, snapshot) {
-              final count = snapshot.data ?? 0;
-              return Text(
-                'Sponsors: $count/2',
-                style: Theme.of(context).textTheme.titleLarge,
-              );
-            },
+          Text('Sponsors Needed',
+              style: Theme.of(context).textTheme.titleLarge),
+          SizedBox(height: 12),
+          Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 3,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              child: StreamBuilder<int>(
+                stream: ReferralService.getSponsorCount(),
+                builder: (context, snapshot) {
+                  final count = snapshot.data ?? 0;
+                  return Text(
+                    'Sponsors: $count / 2',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: primaryColor,
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
-          SizedBox(height: 20),
-          Text('Sponsorship History:', style: Theme.of(context).textTheme.titleMedium),
+          SizedBox(height: 24),
+          Text('Sponsorship History',
+              style: Theme.of(context).textTheme.titleLarge),
+          SizedBox(height: 12),
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
               stream: ReferralService.getSponsorHistory(),
               builder: (context, snapshot) {
                 final history = snapshot.data ?? [];
                 if (history.isEmpty) {
-                  return Center(child: Text('No sponsorship history yet'));
+                  return Center(
+                    child: Text(
+                      'No sponsorship history yet',
+                      style: TextStyle(
+                          color: onBackground.withOpacity(0.7)),
+                    ),
+                  );
                 }
-                
                 return ListView.builder(
                   itemCount: history.length,
                   itemBuilder: (context, index) {
@@ -1097,11 +2084,25 @@ class HomePage extends StatelessWidget {
                           .doc(entry['uid'])
                           .get(),
                       builder: (context, snapshot) {
-                        final userData = snapshot.data?.data() as Map<String, dynamic>?;
+                        final userData =
+                            snapshot.data?.data() as Map<String, dynamic>?;
                         return ListTile(
-                          title: Text(userData?['displayName'] ?? 'Unknown User'),
+                          leading: CircleAvatar(
+                            backgroundColor:
+                                primaryColor.withOpacity(0.2),
+                            child: Icon(Icons.person,
+                                color: primaryColor),
+                          ),
+                          title: Text(
+                              userData?['displayName'] ??
+                                  'Unknown User'),
                           subtitle: Text(
-                            (entry['timestamp'] as Timestamp).toDate().toString(),
+                            (entry['timestamp'] as Timestamp)
+                                .toDate()
+                                .toString(),
+                            style: TextStyle(
+                                color:
+                                    onBackground.withOpacity(0.7)),
                           ),
                         );
                       },
@@ -1132,20 +2133,29 @@ class _OptionsPageState extends State<OptionsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final onBackground = Theme.of(context).colorScheme.onBackground;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Options'),
+        centerTitle: true,
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Row(
         children: [
           NavigationRail(
-            labelType: NavigationRailLabelType.all,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             selectedIndex: _selectedIndex,
             onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+            labelType: NavigationRailLabelType.all,
+            selectedIconTheme: IconThemeData(color: primaryColor),
+            unselectedIconTheme: IconThemeData(color: onBackground.withOpacity(0.6)),
+            selectedLabelTextStyle: TextStyle(color: primaryColor),
+            unselectedLabelTextStyle: TextStyle(color: onBackground.withOpacity(0.6)),
             destinations: [
               NavigationRailDestination(
                 icon: Icon(Icons.person),
@@ -1162,7 +2172,12 @@ class _OptionsPageState extends State<OptionsPage> {
             ],
           ),
           VerticalDivider(thickness: 1, width: 1),
-          Expanded(child: _tabs[_selectedIndex]),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _tabs[_selectedIndex],
+            ),
+          ),
         ],
       ),
     );
@@ -1205,100 +2220,124 @@ class _ProfileContentState extends State<ProfileContent> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(padding: EdgeInsets.all(16), children: [
-      ListTile(
-        title: Text('Date of Birth'),
-        subtitle: Text(_dob ?? '-'),
-        trailing: Icon(Icons.edit),
-        onTap: () async {
-          final d = await showDatePicker(
-            context: context,
-            initialDate: DateTime.now(),
-            firstDate: DateTime(1900),
-            lastDate: DateTime.now(),
-          );
-          if (d != null) {
-            final s = '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
-            await _update('dob', s);
-          }
-        },
-      ),
-      ListTile(
-        title: Text('Gender'),
-        subtitle: Text(_gender ?? '-'),
-        trailing: Icon(Icons.edit),
-        onTap: () async {
-          final choice = await showDialog<String>(
-            context: context,
-            builder: (_) => SimpleDialog(
-              title: Text('Gender'),
-              children: ['Male','Female','Other']
-                  .map((g) => SimpleDialogOption(
-                        onPressed: () => Navigator.pop(context, g),
-                        child: Text(g),
-                      ))
-                  .toList(),
-            ),
-          );
-          if (choice != null) await _update('gender', choice);
-        },
-      ),
-      ListTile(
-        title: Text('Do you want to be a driver?'),
-        subtitle: Text(_wantsToDrive == null
-            ? '-'
-            : (_wantsToDrive!
-                ? 'Yes'
-                : 'No')),
-        trailing: Icon(Icons.edit),
-        onTap: () async {
-          final c = await showDialog<bool>(
-            context: context,
-            builder: (_) => SimpleDialog(
-              title: Text('Do you want to be a driver?'),
-              children: [true, false]
-                  .map((v) => SimpleDialogOption(
-                        onPressed: () => Navigator.pop(context, v),
-                        child: Text(v
-                            ? 'Yes'
-                            : 'No'),
-                      ))
-                  .toList(),
-            ),
-          );
-          if (c != null) await _update('wantsToDrive', c);
-        },
-      ),
-      if (_wantsToDrive == true)
-        ListTile(
-          title: Text('Car Model'),
-          subtitle: Text(_carModel ?? '-'),
-          trailing: Icon(Icons.edit),
-          onTap: () async {
-            final ctl = TextEditingController(text: _carModel);
-            final res = await showDialog<String>(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: Text('Car Model'),
-                content: TextField(controller: ctl),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('No'),
-                  ),
-                  TextButton(
-                    onPressed: () =>
-                        Navigator.pop(context, ctl.text.trim()),
-                    child: Text('Yes'),
-                  ),
-                ],
-              ),
-            );
-            if (res != null && res.isNotEmpty)
-              await _update('carModel', res);
-          },
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final textColor = Theme.of(context).colorScheme.onBackground;
+
+    return ListView(
+      children: [
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            title: Text('Date of Birth', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600)),
+            subtitle: Text(_dob ?? '-', style: TextStyle(color: textColor)),
+            trailing: Icon(Icons.edit, color: primaryColor),
+            onTap: () async {
+              final d = await showDatePicker(
+                context: context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime(1900),
+                lastDate: DateTime.now(),
+              );
+              if (d != null) {
+                final s = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                await _update('dob', s);
+              }
+            },
+          ),
         ),
-    ]);
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            title: Text('Gender', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600)),
+            subtitle: Text(_gender ?? '-', style: TextStyle(color: textColor)),
+            trailing: Icon(Icons.edit, color: primaryColor),
+            onTap: () async {
+              final choice = await showDialog<String>(
+                context: context,
+                builder: (_) => SimpleDialog(
+                  title: Text('Gender'),
+                  children: ['Male', 'Female', 'Other']
+                      .map((g) => SimpleDialogOption(
+                            onPressed: () => Navigator.pop(context, g),
+                            child: Text(g),
+                          ))
+                      .toList(),
+                ),
+              );
+              if (choice != null) await _update('gender', choice);
+            },
+          ),
+        ),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            title: Text('Do you want to be a driver?', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600)),
+            subtitle: Text(
+              _wantsToDrive == null ? '-' : (_wantsToDrive! ? 'Yes' : 'No'),
+              style: TextStyle(color: textColor),
+            ),
+            trailing: Icon(Icons.edit, color: primaryColor),
+            onTap: () async {
+              final c = await showDialog<bool>(
+                context: context,
+                builder: (_) => SimpleDialog(
+                  title: Text('Do you want to be a driver?'),
+                  children: [true, false]
+                      .map((v) => SimpleDialogOption(
+                            onPressed: () => Navigator.pop(context, v),
+                            child: Text(v ? 'Yes' : 'No'),
+                          ))
+                      .toList(),
+                ),
+              );
+              if (c != null) await _update('wantsToDrive', c);
+            },
+          ),
+        ),
+        if (_wantsToDrive == true)
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 3,
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              title: Text('Car Model', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600)),
+              subtitle: Text(_carModel ?? '-', style: TextStyle(color: textColor)),
+              trailing: Icon(Icons.edit, color: primaryColor),
+              onTap: () async {
+                final ctl = TextEditingController(text: _carModel);
+                final res = await showDialog<String>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: Text('Car Model'),
+                    content: TextField(controller: ctl),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, ctl.text.trim()),
+                        child: Text('Save'),
+                      ),
+                    ],
+                  ),
+                );
+                if (res != null && res.isNotEmpty) await _update('carModel', res);
+              },
+            ),
+          ),
+      ],
+    );
   }
 }
 
@@ -1308,30 +2347,48 @@ class SettingsContent extends StatelessWidget {
     final appState = MyApp.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentLoc = Localizations.localeOf(context);
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
-    return ListView(padding: EdgeInsets.all(16), children: [
-      SwitchListTile(
-        title: Text('Toggle Light/Dark Mode'),
-        value: isDark,
-        onChanged: (v) =>
-            appState.setThemeMode(v ? ThemeMode.dark : ThemeMode.light),
-      ),
-      ListTile(
-        title: Text('Switch Language'),
-        trailing: DropdownButton<Locale>(
-          value: currentLoc,
-          items: [Locale('en'), Locale('fr')]
-              .map((loc) => DropdownMenuItem(
-                    value: loc,
-                    child: Text(loc.languageCode.toUpperCase()),
-                  ))
-              .toList(),
-          onChanged: (loc) {
-            if (loc != null) appState.setLocale(loc);
-          },
+    return ListView(
+      children: [
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            title: Text('Light / Dark Mode', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600)),
+            value: isDark,
+            onChanged: (v) => appState.setThemeMode(v ? ThemeMode.dark : ThemeMode.light),
+          ),
         ),
-      ),
-    ]);
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            title: Text('Language', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600)),
+            trailing: DropdownButton<Locale>(
+              value: currentLoc,
+              underline: SizedBox(),
+              items: [Locale('en'), Locale('fr')]
+                  .map(
+                    (loc) => DropdownMenuItem(
+                      value: loc,
+                      child: Text(loc.languageCode.toUpperCase()),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (loc) {
+                if (loc != null) appState.setLocale(loc);
+              },
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1341,109 +2398,117 @@ class AccountContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(padding: EdgeInsets.all(16), children: [
-      ElevatedButton(
-        onPressed: () async {
-          final confirm = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text('Confirm Logout'),
-              content: Text('Are you sure you want to log out?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: Text('Yes'),
-                ),
-              ],
-            ),
-          );
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
-          if (confirm == true) {
-            await _auth.signOut();
-            await _google.signOut();
-            Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
-          }
-        },
-        child: Text('Logout'),
-      ),
-      ElevatedButton(
-        onPressed: () async {
-            final user = _auth.currentUser;
-            if (user?.email == null) return;
-            await _auth.sendPasswordResetEmail(email: user!.email!);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content:
-                    Text('Email sent to ${user.email} to set password.'),
-              ),
-            );
-          },
-        child: Text('Add/Change Account Password'),
-      ),
-      ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red, // make it stand out
+    return ListView(
+      children: [
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            leading: Icon(Icons.logout, color: primaryColor),
+            title: Text('Logout', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600)),
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Confirm Logout'),
+                  content: Text('Are you sure you want to log out?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: Text('Yes'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await _auth.signOut();
+                await _google.signOut();
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+              }
+            },
+          ),
         ),
-        onPressed: () async {
-          final confirm = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text('Confirm Delete'),
-              content: Text(
-                'This will permanently delete your account and all associated data. '
-                'Are you sure?',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: Text('Cancel'),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            leading: Icon(Icons.password, color: primaryColor),
+            title: Text('Add/Change Password', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600)),
+            onTap: () async {
+              final user = _auth.currentUser;
+              if (user?.email == null) return;
+              await _auth.sendPasswordResetEmail(email: user!.email!);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Email sent to ${user.email} to set password.')),
+              );
+            },
+          ),
+        ),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            leading: Icon(Icons.delete_forever, color: Colors.red),
+            title: Text('Delete Account', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Confirm Delete'),
+                  content: Text(
+                    'This will permanently delete your account and all associated data. Are you sure?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: Text('Yes'),
+                    ),
+                  ],
                 ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: Text('Yes'),
-                ),
-              ],
-            ),
-          );
+              );
+              if (confirm != true) return;
 
-          if (confirm != true) return;
+              final user = _auth.currentUser;
+              if (user == null) return;
+              final uid = user.uid;
 
-          final user = _auth.currentUser;
-          if (user == null) return;
+              // 1. Delete Firestore data
+              await FirebaseFirestore.instance.collection('users').doc(uid).delete();
 
-          final uid = user.uid;
-          // 1. Delete Firestore data
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .delete();
-          // (If you have other collections keyed by uid, delete them here similarly)
+              // 2. Remove setup flag
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('setupComplete_$uid');
 
-          // 2. Remove setup flag
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.remove('setupComplete_$uid');
+              // 3. Delete auth user
+              await user.delete();
 
-          // 3. Delete auth user
-          await user.delete();
+              // 4. Sign out from providers
+              await _auth.signOut();
+              await _google.signOut();
 
-          // 4. Sign out from providers
-          await _auth.signOut();
-          await _google.signOut();
-
-          // 5. Navigate back to signup
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            '/signup',
-            (r) => false,
-          );
-        },
-        child: Text('Delete Account'),
-      ),
-    ]);
+              // 5. Navigate back to signup
+              Navigator.pushNamedAndRemoveUntil(context, '/signup', (r) => false);
+            },
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1486,38 +2551,76 @@ class _SponsorPageState extends State<SponsorPage> {
 
   @override
   Widget build(BuildContext context) {
+    final errorColor = Theme.of(context).colorScheme.error;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
     return Scaffold(
-      appBar: AppBar(title: Text('Sponsorship Request')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_error != null)
-              Text(_error!, style: TextStyle(color: Colors.red)),
-            SizedBox(height: 20),
-            Text('Accept sponsorship invitation?',
-                style: Theme.of(context).textTheme.titleLarge),
-            SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      appBar: AppBar(
+        title: Text('Sponsorship Request'),
+        centerTitle: true,
+        elevation: 2,
+      ),
+      body: Center(
+        child: Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ElevatedButton(
-                  onPressed: _processing ? null : _handleAccept,
-                  child: _processing 
-                    ? CircularProgressIndicator()
-                    : Text('Accept'),
-                ),
-                ElevatedButton(
-                  onPressed: _processing ? null : () => Navigator.pop(context),
-                  child: Text('Decline'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey,
+                if (_error != null) ...[
+                  Text(
+                    _error!,
+                    style: TextStyle(color: errorColor, fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
                   ),
+                  SizedBox(height: 20),
+                ],
+                Text(
+                  'Accept sponsorship invitation?',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(color: onSurface),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 40),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _processing ? null : _handleAccept,
+                        child: _processing
+                            ? SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Text('Accept'),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 120,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _processing ? null : () => Navigator.pop(context),
+                        child: Text('Decline'),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: onSurface,
+                          backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
