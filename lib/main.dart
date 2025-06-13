@@ -14,6 +14,7 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map_marker_popup/flutter_map_marker_popup.dart';
+import 'dart:async';
 
 class ReferralService {
   static final _db = FirebaseFirestore.instance;
@@ -77,36 +78,32 @@ class ReferralService {
   }
 
   // Increment sponsor count
-  static Future<void> incrementSponsorCount(String referrerId) async {
-    final user = _auth.currentUser!;
-    final userRef = _db.collection('users').doc(user.uid);
+  static Future<void> incrementSponsorCount(String referrerId, {String? targetUid}) async {
+    final userRef = _db.collection('users').doc(targetUid ?? _auth.currentUser!.uid);
+    final historyRef = userRef.collection('sponsorsHistory');
 
     await _db.runTransaction((transaction) async {
-      // 1. Get current document state
       final docSnapshot = await transaction.get(userRef);
-      
-      // 2. Calculate current sponsor count
-      int currentCount = 0;
-      if (docSnapshot.exists) {
-        currentCount = (docSnapshot.data()!['sponsorsCount'] as int?) ?? 0;
-      }
 
-      // 3. Validate against maximum sponsors
+      int currentCount = (docSnapshot.data()?['sponsorsCount'] as int?) ?? 0;
+
       if (currentCount >= 2) {
         throw StateError('Maximum of 2 sponsors already reached');
       }
 
-      // 4. Initialize document if needed
-      if (!docSnapshot.exists || !docSnapshot.data()!.containsKey('sponsorsCount')) {
-        transaction.set(userRef, {'sponsorsCount': currentCount}, SetOptions(merge: true));
+      final historyQuery = await historyRef
+          .where('uid', isEqualTo: referrerId)
+          .limit(1)
+          .get();
+
+      if (historyQuery.docs.isNotEmpty) {
+        throw StateError('This sponsor has already sponsored this user.');
       }
 
-      // 5. Perform atomic increment
       transaction.update(userRef, {
         'sponsorsCount': FieldValue.increment(1),
       });
 
-      // 6. Add history record
       transaction.set(
         userRef.collection('sponsorsHistory').doc(),
         {
@@ -115,6 +112,73 @@ class ReferralService {
         }
       );
     });
+  }
+
+  /// 1a. Send a sponsorship request
+  static Future<void> sendSponsorRequest({
+    required String toUid,
+    String message = '',
+  }) async {
+    final fromUid = FirebaseAuth.instance.currentUser!.uid;
+    final col     = FirebaseFirestore.instance.collection('sponsorRequests');
+
+    // Check if there's already a non‑declined request
+    final dup = await col
+        .where('fromUid', isEqualTo: fromUid)
+        .where('toUid',   isEqualTo: toUid)
+        .where('status',  whereIn: ['pending', 'accepted'])
+        .get();
+
+    if (dup.docs.isNotEmpty) {
+      throw Exception('You have already invited this user.');
+    }
+
+    // Otherwise add a fresh request
+    await col.add({
+      'fromUid':   fromUid,
+      'toUid':     toUid,
+      'message':   message,
+      'status':    'pending',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// 1b. Stream all pending requests TO the current user
+  static Stream<QuerySnapshot> incomingSponsorRequests() {
+    final uid = _auth.currentUser!.uid;
+    return _db
+      .collection('sponsorRequests')
+      .where('toUid', isEqualTo: uid)
+      .where('status', isEqualTo: 'pending')
+      .orderBy('timestamp', descending: true)
+      .snapshots();
+  }
+
+  /// 1c. Accept or decline a request
+  static Future<void> updateSponsorRequestStatus({
+    required String requestId,
+    required String status, // "accepted" or "declined"
+  }) async {
+    final db     = FirebaseFirestore.instance;
+    final meUid  = FirebaseAuth.instance.currentUser!.uid;
+    final reqRef = db.collection('sponsorRequests').doc(requestId);
+
+    // Step 1: Update the request status
+    await reqRef.update({'status': status});
+
+    // Step 2: If accepted, increment the sponsor count of the request sender (fromUid)
+    if (status == 'accepted') {
+      // Re-read the request doc to get the fromUid (sponsoree)
+      final reqSnap = await reqRef.get();
+      final fromUid = reqSnap.data()?['fromUid'] as String?;
+
+      if (fromUid != null) {
+        // meUid is the sponsor accepting the request
+        await incrementSponsorCount(meUid, targetUid: fromUid);
+      } else {
+        throw StateError('Missing fromUid in sponsor request.');
+      }
+    }
   }
 }
 
@@ -498,6 +562,13 @@ class _SignupPageState extends State<SignupPage> {
         );
         await userCred.user!
             .updateDisplayName('${_firstNameController.text.trim()} ${_lastNameController.text.trim()}');
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCred.user!.uid)
+            .set({
+          'firstName': _firstNameController.text.trim(),
+          'lastName': _lastNameController.text.trim(),
+        }, SetOptions(merge: true));
         await userCred.user!.sendEmailVerification();
         Navigator.pushReplacementNamed(context, '/verifyAccount');
       }
@@ -519,7 +590,18 @@ class _SignupPageState extends State<SignupPage> {
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      await FirebaseAuth.instance.signInWithCredential(credential);
+      UserCredential userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+      String fullName = userCred.user?.displayName ?? '';
+      List<String> nameParts = fullName.split(' ');
+      String firstName = nameParts.first;
+      String lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCred.user!.uid)
+          .set({
+        'firstName': firstName,
+        'lastName': lastName,
+      }, SetOptions(merge: true));
       await navigateAfterAuth(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1556,9 +1638,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool? _driverLocationOn;
   bool? _autoDriveModeOn;
   bool? _driverNotificationsOn;
+  bool? _sponsorshipVisibilityOn;
   final _doc = FirebaseFirestore.instance
       .collection('users')
       .doc(FirebaseAuth.instance.currentUser!.uid);
+  StreamSubscription<QuerySnapshot>? _reqSub;
+  int _prevReqCount = 0;
 
   final PopupController _popupController = PopupController();
 
@@ -1567,10 +1652,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _load();
+
+    _reqSub = ReferralService.incomingSponsorRequests().listen((snap) {
+      final newCount = snap.docs.length;
+      if (newCount > _prevReqCount && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('You have a new sponsorship request!')),
+        );
+      }
+      _prevReqCount = newCount;
+    });
   }
 
   @override
   void dispose() {
+    _reqSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -1599,6 +1695,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _driverLocationOn = d['driverLocationOn'];
       _autoDriveModeOn = d['autoDriveModeOn'];
       _driverNotificationsOn = d['driverNotificationsOn'];
+      _sponsorshipVisibilityOn = d['sponsorshipVisibilityOn'];
     });
   }
 
@@ -1745,6 +1842,35 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
+                  SizedBox(height: 20),
+                  DropdownButtonFormField<bool>(
+                    isExpanded: true,
+                    value: _sponsorshipVisibilityOn,
+                    items: [
+                      DropdownMenuItem(value: true, child: Text('Allow')),
+                      DropdownMenuItem(value: false, child: Text('Do not allow')),
+                    ],
+                    onChanged: (v) async {
+                      if (v != null) await _update('sponsorshipVisibilityOn', v);
+                    },
+                    selectedItemBuilder: (BuildContext context) {
+                      return [true, false].map((value) {
+                        return Text(
+                          value
+                              ? 'Allow sponsorship visibility'
+                              : 'Do not allow sponsorship visibility',
+                          maxLines: 2,
+                          softWrap: true,
+                        );
+                      }).toList();
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Sponsorship visibility',
+                      prefixIcon:
+                          Icon(Icons.visibility, color: primaryColor),
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
                 ],
               ),
             ),
@@ -1782,6 +1908,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ),
           ),
+          const SizedBox(height: 24),
+          _buildRequestsSection(context),
         ],
       ),
     );
@@ -2030,6 +2158,94 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            'Visible Users',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              border: Border.all(color: primaryColor.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .where('sponsorshipVisibilityOn', isEqualTo: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error: ${snapshot.error}',
+                      style: TextStyle(color: onBackground.withOpacity(0.7)),
+                    ),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+                print('Visible users count: ${docs.length}');
+                for (var doc in docs) {
+                  print('doc.id=${doc.id}, data=${doc.data()}');
+                }
+
+                if (docs.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No users have enabled sponsorship visibility.\n(Count = 0)',
+                      style: TextStyle(color: onBackground.withOpacity(0.6)),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'Found ${docs.length} visible user(s)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final data =
+                              docs[index].data()! as Map<String, dynamic>;
+
+                          final firstName = data['firstName'] as String?;
+                          final lastName = data['lastName'] as String?;
+
+                          return ListTile(
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            leading: CircleAvatar(
+                              backgroundColor: primaryColor.withOpacity(0.2),
+                              child: Icon(Icons.person, color: primaryColor),
+                            ),
+                            title: Text('$firstName $lastName'),
+                            onTap: () => _showSponsorRequestDialog(context, docs[index].id, '$firstName $lastName'),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
           Text('Sponsors Needed',
               style: Theme.of(context).textTheme.titleLarge),
           SizedBox(height: 12),
@@ -2114,6 +2330,160 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showSponsorRequestDialog(
+      BuildContext context,
+      String toUid,
+      String displayName,
+  ) {
+    final _msgCtrl = TextEditingController();
+
+    return showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Request sponsorship from $displayName?'),
+        content: TextField(
+          controller: _msgCtrl,
+          decoration: InputDecoration(labelText: 'Optional message'),
+          maxLines: 2,
+        ),
+        actions: [
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+          ElevatedButton(
+            child: Text('Send'),
+            onPressed: () async {
+              await ReferralService.sendSponsorRequest(
+                toUid: toUid,
+                message: _msgCtrl.text.trim(),
+              );
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Request sent')),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequestsSection(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: ReferralService.incomingSponsorRequests(),
+      builder: (ctx, reqSnap) {
+        if (!reqSnap.hasData) return const SizedBox.shrink();
+        final reqDocs = reqSnap.data!.docs;
+        if (reqDocs.isEmpty) return const SizedBox.shrink();
+
+        // 1) Gather unique UIDs
+        final uids = reqDocs
+            .map((d) => (d.data() as Map<String, dynamic>)['fromUid'] as String)
+            .toSet()
+            .toList();
+
+        // 2) Batch‑fetch all user docs in one go
+        return FutureBuilder<QuerySnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: uids)
+              .get(),
+          builder: (ctx2, userSnap) {
+            if (userSnap.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+            if (userSnap.hasError || !userSnap.hasData) {
+              return Center(child: Text('Error loading requesters'));
+            }
+
+            // 3) Build a map uid -> "First Last"
+            final nameMap = {
+              for (var u in userSnap.data!.docs)
+                u.id: '${u['firstName'] ?? ''} ${u['lastName'] ?? ''}'.trim()
+            };
+
+            // 4) Render the full list with names
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Sponsorship Requests',
+                    style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: reqDocs.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (ctx3, i) {
+                    final doc = reqDocs[i];
+                    final data = doc.data()! as Map<String, dynamic>;
+                    final uid = data['fromUid'] as String;
+                    final name = nameMap[uid] ?? uid;
+
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: primaryColor.withOpacity(0.2),
+                        child: Icon(Icons.person, color: primaryColor),
+                      ),
+                      title: Text('From: $name'),
+                      subtitle: Text(data['message'] as String),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.check, color: Colors.green),
+                            onPressed: () async {
+                              try {
+                                await ReferralService.updateSponsorRequestStatus(
+                                  requestId: doc.id,
+                                  status: 'accepted',
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Request accepted')),
+                                );
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text('Failed to accept: $e')),
+                                );
+                              }
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.clear, color: Colors.red),
+                            onPressed: () async {
+                              try {
+                                await ReferralService.updateSponsorRequestStatus(
+                                  requestId: doc.id,
+                                  status: 'declined',
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Request declined')),
+                                );
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text('Failed to decline: $e')),
+                                );
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
