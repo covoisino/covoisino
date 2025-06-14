@@ -1634,6 +1634,15 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _selectedIndex = 0;
 
+  final MapController _mapController = MapController();
+
+  final Map<String, LatLng> _cityCoordinates = const {
+    'Paris':    LatLng(48.8566, 2.3522),
+    'London':   LatLng(51.5074, -0.1278),
+    'New York': LatLng(40.7128, -74.0060),
+    'Chicago':  LatLng(41.8781, -87.6298),
+  };
+
   String? _location;
   bool? _driverLocationOn;
   bool? _autoDriveModeOn;
@@ -1697,6 +1706,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _driverNotificationsOn = d['driverNotificationsOn'];
       _sponsorshipVisibilityOn = d['sponsorshipVisibilityOn'];
     });
+    _mapController.move(_cityCoordinates[_location]!, 13.0);
   }
 
   Future<void> _update(String field, dynamic val) async {
@@ -1748,7 +1758,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           if (count < 2) {
             return _buildSponsorInfo(context);
           } else {
-            return _buildWithTabs(context);
+            return IndexedStack(
+              index: _selectedIndex,
+              children: [
+                _buildHomeTab(context),
+                _buildRideTab(context),
+                _buildDriveTab(context),
+              ],
+            );
           }
         },
       ),
@@ -1779,19 +1796,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         },
       ),
     );
-  }
-
-  Widget _buildWithTabs(BuildContext context) {
-    switch (_selectedIndex) {
-      case 0:
-        return _buildHomeTab(context);
-      case 1:
-        return _buildRideTab(context);
-      case 2:
-        return _buildDriveTab(context);
-      default:
-        return SizedBox.expand();
-    }
   }
 
   Widget _buildHomeTab(BuildContext context) {
@@ -1830,6 +1834,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         .toList(),
                     onChanged: (v) async {
                       if (v != null) await _update('location', v);
+                      final newCenter = _cityCoordinates[v]!;
+                      const double newZoom = 13.0;
+                      _mapController.move(newCenter,newZoom);
                     },
                     selectedItemBuilder: (context) {
                       return ['Paris','London', 'New York', 'Chicago']
@@ -1918,12 +1925,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _buildRideTab(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
+    final LatLng center = _cityCoordinates[_location] ?? LatLng(41.8781, -87.6298);
+
     final markers = <Marker>[];
     if (_driverLocationOn == true) {
       markers.add(
         Marker(
-          // point: LatLng(41.791578, -87.599826),
-          point: LatLng(45.811516, 4.797935),
+          point: center,
           width: 30,
           height: 30,
           child: GestureDetector(
@@ -1937,10 +1945,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Stack(
       children: [
         FlutterMap(
+          mapController: _mapController,
           options: MapOptions(
-            // initialCenter: LatLng(41.791578, -87.599826),
-            initialCenter: LatLng(45.811516, 4.797935),
-            initialZoom: 19.5,
+            initialCenter: center,
+            initialZoom: 13.0,
+            // initialZoom: 19.5,
             onTap: (_, __) => _popupController.hideAllPopups(),
           ),
           children: [
