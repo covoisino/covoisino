@@ -1627,6 +1627,13 @@ class _SetupPageState extends State<SetupPage> {
   }
 }
 
+class DriverMarker {
+  final Marker marker;
+  final Map<String, dynamic> data;
+
+  DriverMarker({required this.marker, required this.data});
+}
+
 class HomePage extends StatefulWidget {
   @override
   _HomePageState createState() => _HomePageState();
@@ -1746,7 +1753,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     try {
       _mapController.move(_cityCoordinates[_location]!, 13.0);
     } catch (e) {
-      
+
     }
   }
 
@@ -1991,7 +1998,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             }
 
             // Convert each doc with a GeoPoint into a Marker
-            final markers = <Marker>[];
+            final driverMarkers = <DriverMarker>[];
             for (final doc in snap.data!.docs) {
               final data = doc.data()! as Map<String, dynamic>;
               final gp = data['currentLocation'] as GeoPoint?;
@@ -2015,8 +2022,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               );
 
-              markers.add(marker);
+              driverMarkers.add(DriverMarker(marker: marker, data: data));
             }
+
+            final markers = driverMarkers.map((dm) => dm.marker).toList();
 
             return FlutterMap(
               mapController: _mapController,
@@ -2035,26 +2044,56 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     markers: markers,
                     popupController: _popupController,
                     popupDisplayOptions: PopupDisplayOptions(
-                      builder: (BuildContext context, Marker marker) => Card(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        elevation: 3,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Driver',
-                                style: TextStyle(
-                                    color: primaryColor,
-                                    fontWeight: FontWeight.w600),
+                      builder: (BuildContext context, Marker marker) {
+                        // Find the driver marker that matches this marker
+                        final driverData = driverMarkers.firstWhere(
+                          (dm) => dm.marker == marker,
+                          orElse: () => DriverMarker(marker: marker, data: {}),
+                        ).data;
+
+                        final name = '${driverData['firstName'] ?? ''} ${driverData['lastName'] ?? ''}';
+                        final phone = driverData['phone'] ?? 'N/A';
+
+                        return ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: 200),
+                          child: Card(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 3,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: TextStyle(
+                                      color: primaryColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Phone: $phone',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Center(
+                                      child: ElevatedButton(
+                                        onPressed: () {},
+                                        child: Text('Request Ride'),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text('Tap for details'),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ),
                 ),
