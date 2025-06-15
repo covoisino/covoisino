@@ -14,6 +14,7 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map_marker_popup/flutter_map_marker_popup.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 
 class ReferralService {
@@ -399,7 +400,7 @@ class _MyAppState extends State<MyApp> {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: lightColorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         titleTextStyle: TextStyle(
@@ -460,7 +461,7 @@ class _MyAppState extends State<MyApp> {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: darkColorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         titleTextStyle: TextStyle(
@@ -1652,6 +1653,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       .collection('users')
       .doc(FirebaseAuth.instance.currentUser!.uid);
   StreamSubscription<QuerySnapshot>? _reqSub;
+  StreamSubscription<Position>? _posSub;
   int _prevReqCount = 0;
 
   final PopupController _popupController = PopupController();
@@ -1660,7 +1662,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _load();
+    _load().then((_) => _maybeStartLocationUpdates());
 
     _reqSub = ReferralService.incomingSponsorRequests().listen((snap) {
       final newCount = snap.docs.length;
@@ -1676,8 +1678,43 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     _reqSub?.cancel();
+    _posSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Future<void> _maybeStartLocationUpdates() async {
+    // Only if driverLocationOn is true:
+    if (_driverLocationOn != true) return;
+
+    // 1. Ask for permission
+    LocationPermission perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.deniedForever ||
+          perm == LocationPermission.denied) {
+        // Permissions are denied, you could show a message here
+        return;
+      }
+    }
+
+    // 2. Start listening
+    _posSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 10, // only if moved ≥10m
+      ),
+    ).listen((Position pos) {
+      // Write into Firestore
+      FirebaseFirestore.instance
+        .collection('users')
+        .doc(FirebaseAuth.instance.currentUser!.uid)
+        .set({
+          'currentLocation': GeoPoint(pos.latitude, pos.longitude),
+          // Keep your driverLocationOn flag in sync too
+          'driverLocationOn': true,
+        }, SetOptions(merge: true));
+    });
   }
 
   @override
@@ -1706,12 +1743,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _driverNotificationsOn = d['driverNotificationsOn'];
       _sponsorshipVisibilityOn = d['sponsorshipVisibilityOn'];
     });
-    _mapController.move(_cityCoordinates[_location]!, 13.0);
+    try {
+      _mapController.move(_cityCoordinates[_location]!, 13.0);
+    } catch (e) {
+      
+    }
   }
 
   Future<void> _update(String field, dynamic val) async {
     await _doc.set({field: val}, SetOptions(merge: true));
     await _load();
+    if (field == 'driverLocationOn') {
+      // stop or start updates
+      if (val == true) {
+        _maybeStartLocationUpdates();
+      } else {
+        await _posSub?.cancel();
+        _posSub = null;
+      }
+    }
   }
 
   Future<void> _copyReferralLink(BuildContext ctx) async {
@@ -1927,63 +1977,90 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     final LatLng center = _cityCoordinates[_location] ?? LatLng(41.8781, -87.6298);
 
-    final markers = <Marker>[];
-    if (_driverLocationOn == true) {
-      markers.add(
-        Marker(
-          point: center,
-          width: 30,
-          height: 30,
-          child: GestureDetector(
-            child:
-                Icon(Icons.directions_car_filled, size: 40, color: primaryColor),
-          ),
-        ),
-      );
-    }
-
     return Stack(
       children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: center,
-            initialZoom: 13.0,
-            // initialZoom: 19.5,
-            onTap: (_, __) => _popupController.hideAllPopups(),
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            ),
-            MarkerLayer(markers: markers),
-            PopupMarkerLayerWidget(
-              options: PopupMarkerLayerOptions(
-                markers: markers,
-                popupController: _popupController,
-                popupDisplayOptions: PopupDisplayOptions(
-                  builder: (BuildContext context, Marker marker) => Card(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    elevation: 3,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text("John Pork",
-                              style: TextStyle(
-                                  color: primaryColor,
-                                  fontWeight: FontWeight.w600)),
-                          Text("(571)-639-1312"),
-                        ],
+        // StreamBuilder around the map so we can update markers live
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .where('driverLocationOn', isEqualTo: true)
+              .snapshots(),
+          builder: (ctx, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+
+            // Convert each doc with a GeoPoint into a Marker
+            final markers = <Marker>[];
+            for (final doc in snap.data!.docs) {
+              final data = doc.data()! as Map<String, dynamic>;
+              final gp = data['currentLocation'] as GeoPoint?;
+              if (gp == null) continue;
+
+              final ll = LatLng(gp.latitude, gp.longitude);
+
+              // capture the marker instance
+              late final Marker marker;
+              marker = Marker(
+                point: ll,
+                width: 30,
+                height: 30,
+                child: GestureDetector(
+                  onTap: () => _popupController.togglePopup(marker),
+                  child: Icon(
+                    Icons.directions_car_filled,
+                    size: 40,
+                    color: primaryColor,
+                  ),
+                ),
+              );
+
+              markers.add(marker);
+            }
+
+            return FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: center,
+                initialZoom: 13.0,
+                onTap: (_, __) => _popupController.hideAllPopups(),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                ),
+                MarkerLayer(markers: markers),
+                PopupMarkerLayerWidget(
+                  options: PopupMarkerLayerOptions(
+                    markers: markers,
+                    popupController: _popupController,
+                    popupDisplayOptions: PopupDisplayOptions(
+                      builder: (BuildContext context, Marker marker) => Card(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        elevation: 3,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Driver',
+                                style: TextStyle(
+                                    color: primaryColor,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              Text('Tap for details'),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
         Positioned(
           bottom: 24,
