@@ -2022,7 +2022,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               );
 
-              driverMarkers.add(DriverMarker(marker: marker, data: data));
+              driverMarkers.add(DriverMarker(marker: marker, data: {...data, 'uid': doc.id}));
             }
 
             final markers = driverMarkers.map((dm) => dm.marker).toList();
@@ -2083,7 +2083,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     alignment: Alignment.centerLeft,
                                     child: Center(
                                       child: ElevatedButton(
-                                        onPressed: () {},
+                                        onPressed: () async {
+                                          final currentUser = FirebaseAuth.instance.currentUser;
+                                          final riderDoc = await FirebaseFirestore.instance
+                                              .collection('users')
+                                              .doc(currentUser?.uid)
+                                              .get();
+
+                                          final riderData = riderDoc.data();
+                                          final riderName = '${riderData?['firstName'] ?? ''} ${riderData?['lastName'] ?? ''}';
+
+                                          await FirebaseFirestore.instance.collection('rideRequests').add({
+                                            'driverId': driverData['uid'], // Make sure this field exists in your data
+                                            'riderName': riderName,
+                                            'timestamp': FieldValue.serverTimestamp(),
+                                          });
+                                        },
                                         child: Text('Request Ride'),
                                       ),
                                     ),
@@ -2268,6 +2283,59 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ],
               ),
             ),
+          ),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('rideRequests')
+                .where('driverId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+                .orderBy('timestamp', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return SizedBox();
+
+              final requests = snapshot.data!.docs;
+
+              if (requests.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Text('No ride requests at the moment.'),
+                );
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Ride Requests', style: Theme.of(context).textTheme.titleLarge),
+                    SizedBox(height: 12),
+                    ...requests.map((doc) {
+                      final data = doc.data()! as Map<String, dynamic>;
+                      final riderName = data['riderName'] ?? 'Unknown';
+
+                      return Card(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        elevation: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        child: ListTile(
+                          title: Text('Request from $riderName'),
+                          trailing: IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            onPressed: () async {
+                              await FirebaseFirestore.instance
+                                  .collection('rideRequests')
+                                  .doc(doc.id)
+                                  .delete();
+                            },
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
