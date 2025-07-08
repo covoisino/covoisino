@@ -1,0 +1,29 @@
+workflows:
+  ios-workflow:
+    name: iOS Build with Swift Fix
+    environment:
+      groups:
+        # Add your environment variables here
+    scripts:
+      # 1. Create dummy Swift file
+      - name: Add Swift Support
+        script: |
+          mkdir -p ios/Runner
+          echo "import Foundation" > ios/Runner/dummy.swift
+
+      # 2. Update Xcode project settings
+      - name: Patch Xcode Project
+        script: |
+          cd ios
+          /usr/libexec/PlistBuddy -c "Add :ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES string YES" Runner/Info.plist
+          sed -i '' 's/SWIFT_VERSION = .*/SWIFT_VERSION = 5.0; ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;/g' Runner.xcodeproj/project.pbxproj
+
+      # 3. Clean and build
+      - name: Build iOS
+        script: |
+          flutter clean
+          rm -rf ios/Pods ios/Podfile.lock
+          flutter pub get
+          cd ios && pod install --repo-update
+          cd ..
+          flutter build ipa --release
