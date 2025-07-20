@@ -49,6 +49,7 @@ dependencies:
   flutter_map_marker_popup: ^8.0.1
   geolocator: ^14.0.1
   flutter_riverpod: ^2.6.1
+  firebase_database: ^11.3.9
 
 dev_dependencies:
   flutter_test:
@@ -71,6 +72,8 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  generate: true
 
   # To add assets to your application, add an assets section, like this:
   # assets:
