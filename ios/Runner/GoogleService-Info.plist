@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>333501090169-80fguof5ntnjec69pbovmtjqk43k4ij1.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.333501090169-80fguof5ntnjec69pbovmtjqk43k4ij1</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>333501090169-iir8sfg4hfnhctk7ceiqueslh5a7ffv7.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyAHwy1wCeGICE6VFI_aAN00ZvtPWbfzfOc</string>
+	<key>GCM_SENDER_ID</key>
+	<string>333501090169</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.covoisino</string>
+	<key>PROJECT_ID</key>
+	<string>covoisino-3dd5d</string>
+	<key>STORAGE_BUCKET</key>
+	<string>covoisino-3dd5d.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:333501090169:ios:a990fa1bdbae952f5487a8</string>
+	<key>DATABASE_URL</key>
+	<string>https://covoisino-3dd5d-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>
