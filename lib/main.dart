@@ -14,7 +14,6 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   final referralService = ReferralLinkService(navKey);
-  await referralService.init();
   runApp(
     ProviderScope(
       overrides: [
@@ -23,4 +22,7 @@ void main() async {
       child: MyApp()
     ),
   );
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await referralService.init();
+  });
 }
