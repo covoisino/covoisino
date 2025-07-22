@@ -47,6 +47,10 @@
 	<true/>
 	<key>GIDClientID</key>
 	<string>333501090169-80fguof5ntnjec69pbovmtjqk43k4ij1.apps.googleusercontent.com</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to match you with nearby riders and drivers.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We use your location to offer continuous navigation and safety tracking, even when the app is in the background.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 	<dict>
