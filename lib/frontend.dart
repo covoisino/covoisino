@@ -852,27 +852,31 @@ class HomePage extends ConsumerWidget {
 
     final sponsorsCountValue = ref.watch(homePageSponsorsCountValueProvider);
 
-    ProviderSubscription subscription = ref.listenManual(driverLocationOnValueProvider, (previous, next) async {
-      final driverLocationOn = next.value ?? false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ProviderSubscription subscription = ref.listenManual(driverLocationOnValueProvider, (previous, next) async {
+        final driverLocationOn = next.value ?? false;
 
-      if (driverLocationOn) {
-        final hasRun = ref.read(hasRequestedLocationPermissionProvider);
-        if (!hasRun) {
-          ref.read(hasRequestedLocationPermissionProvider.notifier).state = true;
-          await checkAndRequestLocationPermission();
-        }
+        if (driverLocationOn) {
+          final hasRun = ref.read(hasRequestedLocationPermissionProvider);
+          if (!hasRun) {
+            ref.read(hasRequestedLocationPermissionProvider.notifier).state = true;
+            await checkAndRequestLocationPermission();
+          }
 
-        if (!locationUpdater.isRunning) {
-          locationUpdater.startUpdatingLocation();
+          if (!locationUpdater.isRunning) {
+            locationUpdater.startUpdatingLocation();
+          }
+        } else {
+          try {
+            await locationUpdater.stopUpdatingLocation();
+            ref.read(stopUpdatingLocationInProgressProvider.notifier).state = false;
+          } catch (e) {
+            print("STOP UPDATING LOCATION ERROR: $e");
+          }
         }
-      } else {
-        try {
-          await locationUpdater.stopUpdatingLocation();
-          ref.read(stopUpdatingLocationInProgressProvider.notifier).state = false;
-        } catch (e) {
-          print("STOP UPDATING LOCATION ERROR: $e");
-        }
-      }
+      });
+
+      ref.read(driverLocationOnListenerProvider.notifier).state = subscription;
     });
 
     return sponsorsCountValue.when(
