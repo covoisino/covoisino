@@ -57,6 +57,14 @@
 		<string>com.googleusercontent.apps.333501090169-80fguof5ntnjec69pbovmtjqk43k4ij1</string>
 		</array>
 	</dict>
+	<dict>
+		<key>CFBundleTypeRole</key>
+		<string>Editor</string>
+		<key>CFBundleURLSchemes</key>
+		<array>
+		<string>app-1-333501090169-ios-a990fa1bdbae952f5487a8</string>
+		</array>
+	</dict>
 	</array>
 </dict>
 </plist>
