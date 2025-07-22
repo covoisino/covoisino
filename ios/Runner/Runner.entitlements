@@ -5,7 +5,7 @@
 <dict>
   <key>com.apple.developer.associated-domains</key>
   <array>
-    <string>applinks:covoisino.github.io</string>
+    <string>applinks:covoisino.github.io?mode=developer</string>
   </array>
 </dict>
 </plist>
