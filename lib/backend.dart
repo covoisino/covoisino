@@ -630,7 +630,8 @@ Stream<Map<String, DriverMarkerInformation>> getDriverMarkerInformationsStream()
 Stream<bool> getDriverLocationOnStream() {
   try {
     final user = FirebaseAuth.instance.currentUser;
-    final ref = FirebaseDatabase.instance.ref('users/${user?.uid}/driverLocationOn');
+    if (user == null) return Stream.value(false);
+    final ref = FirebaseDatabase.instance.ref('users/${user.uid}/driverLocationOn');
 
     return ref.onValue.map((event) {
       final value = event.snapshot.value;

@@ -44,6 +44,7 @@ final driverLocationOnValueProvider = StreamProvider.autoDispose<bool>((ref) {
   });
 });
 final stopUpdatingLocationInProgressProvider = StateProvider<bool>((ref) => false);
+final driverLocationOnListenerProvider = StateProvider<ProviderSubscription?>((ref) => null);
 final usersCollectionProvider =
     StateNotifierProvider<UsersCollectionNotifier, UserModel?>(
   (ref) => UsersCollectionNotifier(),
@@ -851,7 +852,7 @@ class HomePage extends ConsumerWidget {
 
     final sponsorsCountValue = ref.watch(homePageSponsorsCountValueProvider);
 
-    ref.listen(driverLocationOnValueProvider, (previous, next) async {
+    ProviderSubscription subscription = ref.listenManual(driverLocationOnValueProvider, (previous, next) async {
       final driverLocationOn = next.value ?? false;
 
       if (driverLocationOn) {
@@ -1719,6 +1720,8 @@ Future<void> waitForDriverLocationToStop(WidgetRef ref) async {
               ref.read(stopUpdatingLocationInProgressProvider.notifier).state = false;
             }
             ref.read(logoutLoadingProvider.notifier).state = false;
+            ref.read(driverLocationOnListenerProvider.notifier).state?.close();
+            ref.read(driverLocationOnListenerProvider.notifier).state = null;
             Navigator.pop(context);
             Navigator.pushReplacement(context,MaterialPageRoute(builder: (context) => LoginPage()));
             await Future.delayed(Duration(milliseconds: 500));
